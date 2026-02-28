@@ -1,0 +1,56 @@
+{
+  "name": "errorpare",
+  "version": "1.0.1",
+  "description": "AI报错压缩工具 - 让Claude/Gemini更高效",
+  "type": "module",
+  "bin": {
+    "errorpare": "dist/cli/index.js",
+    "errorpare-mcp": "dist/bin/mcp.js"
+  },
+  "files": [
+    "dist",
+    "skill"
+  ],
+  "scripts": {
+    "build": "tsup src --dts",
+    "dev": "tsup src --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "keywords": [
+    "error",
+    "compression",
+    "deduplication",
+    "llm",
+    "mcp",
+    "token-optimization",
+    "ai",
+    "claude",
+    "cursor"
+  ],
+  "author": "ErrorPare Team",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/cross-spawn": "^6.0.6",
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "eslint": "^8.55.0",
+    "prettier": "^3.1.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "commander": "^11.1.0",
+    "cross-spawn": "^7.0.6",
+    "node-fetch": "^3.3.2",
+    "node-pty": "^1.0.0",
+    "strip-ansi": "^6.0.1",
+    "yaml": "^2.3.4",
+    "zod": "^3.22.4"
+  }
+}
