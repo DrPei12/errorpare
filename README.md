@@ -2,9 +2,9 @@
 
 <div align="center">
 
-![ErrorPare Logo](docs/logo.svg)
+![ErrorPare Logo](docs/logo.png)
 
-**LLM报错信息压缩工具 | 减少Token消耗 | 提升调试效率**
+**LLM 报错信息压缩工具 | 减少 Token 消耗 | 提升调试效率**
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-18+-green.svg)](https://nodejs.org)
@@ -18,11 +18,11 @@
 
 ## ✨ 特性
 
-- 🚀 **智能去重** - 自动检测并压缩重复报错，60-90%压缩率
-- 📊 **Token优化** - 专为LLM设计，减少上下文消耗
-- 🌍 **多语言支持** - TypeScript、Python、Go、Java、Rust等
-- 🔧 **多种使用方式** - CLI工具、SaaS网站、OpenClaw Skills
-- 📈 **根因分析** - Pro版本提供智能错误分析
+- 🚀 **智能去重** - 自动检测并压缩重复报错，60-90% 压缩率
+- 📊 **Token 优化** - 专为 LLM 设计，减少上下文消耗
+- 🌍 **多语言支持** - TypeScript、Python、Go、Java、Rust 等
+- 🔧 **多种使用方式** - CLI 工具、OpenClaw Skills
+- 📈 **根因分析** - 支持本地规则引擎和 LLM 智能分析
 - 🔒 **安全可靠** - 本地处理，数据不外传
 
 ---
@@ -55,10 +55,6 @@ errorpare analyze compile.log
 errorpare --help
 ```
 
-### 在线体验
-
-访问 [errorpare.app](https://errorpare.app) 在线使用。
-
 ---
 
 ## 📊 效果演示
@@ -67,8 +63,8 @@ errorpare --help
 
 | 指标 | 压缩前 | 压缩后 |
 |-----|--------|--------|
-| 错误数量 | 100条 | 12条 |
-| Token消耗 | 15,000 | 1,800 |
+| 错误数量 | 100 条 | 12 条 |
+| Token 消耗 | 15,000 | 1,800 |
 | 压缩率 | - | **88%** |
 
 ### 示例输入
@@ -94,28 +90,28 @@ Error: TypeError: Cannot read property 'x' of undefined
 ```
 === 错误压缩报告 ===
 
-原始错误: 100条
-去重后: 1条唯一错误
-压缩率: 99%
+原始错误：100 条
+去重后：1 条唯一错误
+压缩率：99%
 
 唯一错误:
 1. [100x] TypeError: Cannot read property 'x' of undefined
-   位置: foo.js:10:5
-   建议: 检查变量是否已定义
+   位置：foo.js:10:5
+   建议：检查变量是否已定义
 ```
 
 ---
 
 ## 📦 安装方式
 
-### CLI工具
+### CLI 工具
 
 ```bash
 npm install -g errorpare
 errorpare --help
 ```
 
-### Node.js库
+### Node.js 库
 
 ```bash
 npm install errorpare
@@ -135,7 +131,7 @@ console.log(analysis.rootCause);
 
 ### OpenClaw Skills
 
-在OpenClaw中直接使用：
+在 OpenClaw 中直接使用：
 
 ```typescript
 // 当用户发送报错信息时
@@ -147,14 +143,6 @@ await skills.errorpare.compress({
     analyzeRootCause: true
   }
 });
-```
-
-### SaaS API
-
-```bash
-curl -X POST https://api.errorpare.app/compress \
-  -H "Content-Type: application/json" \
-  -d '{"errors": ["error1", "error2"], "plan": "pro"}'
 ```
 
 ---
@@ -178,28 +166,11 @@ curl -X POST https://api.errorpare.app/compress \
 
 - [安装指南](docs/INSTALL.md)
 - [使用示例](docs/EXAMPLES.md)
-- [API文档](docs/API.md)
-- [CLI命令](docs/CLI.md)
+- [API 文档](docs/API.md)
+- [CLI 命令](docs/CLI.md)
 - [贡献指南](CONTRIBUTING.md)
 - [更新日志](CHANGELOG.md)
-
----
-
-## 💰 定价
-
-| 功能 | 免费版 | Pro版 | Team版 |
-|-----|--------|-------|--------|
-| 压缩次数/月 | 100 | 无限 | 无限 |
-| CLI工具 | ✅ | ✅ | ✅ |
-| 基础去重 | ✅ | ✅ | ✅ |
-| LLM根因分析 | ❌ | ✅ | ✅ |
-| 修复建议 | ❌ | ✅ | ✅ |
-| API访问 | ❌ | ✅ | ✅ |
-| 团队协作 | ❌ | ❌ | ✅ |
-| 优先支持 | ❌ | ❌ | ✅ |
-| 价格 | $0 | $9/月 | $29/月 |
-
-[立即升级 →](https://errorpare.app/pricing)
+- [Phase 2 开发计划](docs/PHASE2_PLAN.md)
 
 ---
 
@@ -209,13 +180,10 @@ curl -X POST https://api.errorpare.app/compress \
 
 ### 贡献方式
 
-- 🐛 报告Bug
+- 🐛 报告 Bug
 - 💡 提出新功能
 - 📝 完善文档
-- 🔧 提交Pull Request
-- 💰 赞助项目
-
-### 赞助商
+- 🔧 提交 Pull Request
 
 ---
 
@@ -227,16 +195,14 @@ curl -X POST https://api.errorpare.app/compress \
 
 ## 📬 联系
 
-- 💬 [Discord社区](https://discord.gg/errorpare)
-- 🐦 [Twitter/X](https://twitter.com/errorpare)
+- 🐙 [GitHub Issues](https://github.com/DrPei12/errorpare/issues)
 - 📧 [Email](mailto:hello@errorpare.app)
-- 🐙 [GitHub Issues](https://github.com/errorpare/errorpare/issues)
 
 ---
 
 <div align="center">
 
-**用ErrorPare，让报错更清晰 ❤️**
+**用 ErrorPare，让报错更清晰 ❤️**
 
 Made with ❤️ by the ErrorPare Team
 
