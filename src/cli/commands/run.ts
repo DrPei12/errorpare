@@ -1,4 +1,4 @@
-// ErrorPare - CLI 'run' command (Phase 2: with --analyze support)
+// ErrorPare - CLI 'run' command (Phase 2: with compression + analysis)
 
 import { Command } from 'commander';
 import chalk from 'chalk';
@@ -12,6 +12,7 @@ interface RunOptions {
   local?: boolean;
   json?: boolean;
   output?: string;
+  noCompress?: boolean;
 }
 
 export function createRunCommand(): Command {
@@ -23,6 +24,7 @@ export function createRunCommand(): Command {
     .option('-a, --analyze', 'Enable LLM-powered root cause analysis')
     .option('--local', 'Local compression only (no API calls)')
     .option('--json', 'Output in JSON format')
+    .option('--no-compress', 'Skip compression, show raw output')
     .option('-o, --output <file>', 'Write output to file')
     .action(async (cmd: string, options: RunOptions) => {
       await runCommand(cmd, options);
@@ -35,48 +37,43 @@ async function runCommand(commandStr: string, options: RunOptions): Promise<void
   const configManager = new ConfigManager();
   const config = configManager.getConfig();
   
-  // Check if analyze mode is requested but not configured
-  if (options.analyze && !configManager.isLLMConfigured()) {
-    console.log(chalk.yellow('⚠️  Analyze mode requires LLM configuration'));
-    console.log(chalk.gray('   Run: errorpare init --analyze'));
-    console.log('');
-    console.log(chalk.gray('Falling back to local analysis...'));
-    console.log('');
-  }
-  
   console.log(chalk.cyan('🦞 ErrorPare'));
   console.log(chalk.gray(`Executing: ${commandStr}`));
   console.log(chalk.gray(`Mode: ${options.analyze && configManager.isLLMConfigured() ? 'analyze' : 'compress'}`));
   console.log('');
-  console.log(chalk.gray('─'.repeat(50)));
-  console.log('');
   
-  // Execute command
-  const result = await executeCommand(commandStr);
+  const result = await executeCommandSilent(commandStr);
   
   if (result.success) {
     console.log(chalk.green('✅ Command succeeded'));
-    if (result.output) {
+    if (result.output && result.output.trim()) {
       console.log(result.output);
     }
     return;
   }
   
-  // Command failed - compress and analyze error
-  console.log(chalk.red('❌ Command failed'));
-  console.log('');
-  
   const errorText = result.stderr || result.stdout;
   
-  // Rule-based analysis
+  if (!errorText.trim()) {
+    console.log(chalk.yellow('⚠️  Command failed with no output'));
+    console.log(chalk.gray(`Exit code: ${result.code}`));
+    return;
+  }
+  
+  // Smart compression
+  const { compressedOutput, compressionStats } = smartCompress(errorText, {
+    gitAware: config.settings.gitAware,
+  });
+  
   const ruleEngine = new RuleEngine();
   const matches = ruleEngine.match(errorText);
   
   if (options.json) {
-    // JSON output
     const output = {
       success: false,
-      error: errorText,
+      exitCode: result.code,
+      compression: compressionStats,
+      error: compressedOutput,
       matches: matches.map(m => ({
         ruleId: m.rule.id,
         name: m.rule.name,
@@ -89,11 +86,24 @@ async function runCommand(commandStr: string, options: RunOptions): Promise<void
     return;
   }
   
-  // Text output
-  console.log(chalk.red('─'.repeat(50)));
-  console.log(chalk.red('ERROR SUMMARY'));
-  console.log(chalk.red('─'.repeat(50)));
+  console.log(chalk.red('❌ Command failed'));
   console.log('');
+  console.log(chalk.red('═'.repeat(60)));
+  console.log(chalk.red('📊 ERROR SUMMARY'));
+  console.log(chalk.red('═'.repeat(60)));
+  console.log('');
+  
+  if (compressionStats) {
+    const reduction = compressionStats.originalLines > 0 
+      ? Math.round((1 - compressionStats.compressedLines / compressionStats.originalLines) * 100)
+      : 0;
+    console.log(chalk.green(`📦 Compression: ${compressionStats.originalLines} → ${compressionStats.compressedLines} lines (${reduction}% reduction)`));
+    if (compressionStats.thirdPartyCollapsed && compressionStats.thirdPartyCollapsed > 0) {
+      console.log(chalk.green(`🌳 Third-party frames collapsed: ${compressionStats.thirdPartyCollapsed}`));
+    }
+    console.log(chalk.green(`🎯 Unique errors: ${compressionStats.uniqueErrors}`));
+    console.log('');
+  }
   
   if (matches.length > 0) {
     const topMatch = matches[0];
@@ -106,62 +116,158 @@ async function runCommand(commandStr: string, options: RunOptions): Promise<void
     console.log('');
     
     if (matches.length > 1) {
-      console.log(chalk.gray(`   +${matches.length - 1} more match(es)`));
+      const otherCategories = [...new Set(matches.slice(1).map(m => m.rule.category))];
+      if (otherCategories.length > 0) {
+        console.log(chalk.gray(`   +${matches.length - 1} more match(es) in categories: ${otherCategories.join(', ')}`));
+      } else {
+        console.log(chalk.gray(`   +${matches.length - 1} more match(es)`));
+      }
       console.log('');
     }
   }
   
-  // LLM Analysis (if requested and configured)
   if (options.analyze && configManager.isLLMConfigured()) {
-    console.log(chalk.gray('─'.repeat(50)));
+    console.log(chalk.magenta('─'.repeat(60)));
+    console.log(chalk.magenta('🤖 AI ROOT CAUSE ANALYSIS'));
+    console.log(chalk.magenta('─'.repeat(60)));
     console.log('');
     
     try {
       const analyzer = new LLMAnalyzer(config.llm);
       const analysis = await analyzer.analyze(errorText);
       
-      console.log(chalk.magenta('🤖 AI ANALYSIS'));
-      console.log(chalk.magenta('─'.repeat(50)));
-      console.log('');
       console.log(chalk.yellow('Root Cause:'));
-      console.log(chalk.gray(`  ${analysis.rootCause}`));
+      console.log(chalk.white(`  ${analysis.rootCause}`));
       console.log('');
       console.log(chalk.yellow('Category:'));
-      console.log(chalk.gray(`  ${analysis.category}`));
+      console.log(chalk.white(`  ${analysis.category}`));
       console.log('');
-      console.log(chalk.yellow('Suggestion:'));
-      console.log(chalk.gray(`  ${analysis.suggestion}`));
+      console.log(chalk.yellow('Fix Recommendation:'));
+      console.log(chalk.white(`  ${analysis.suggestion}`));
       if (analysis.codeFix) {
         console.log('');
         console.log(chalk.yellow('Code Fix:'));
-        console.log(chalk.gray(`  ${analysis.codeFix}`));
+        const codeFix = typeof analysis.codeFix === 'string' ? analysis.codeFix : JSON.stringify(analysis.codeFix, null, 2);
+        console.log(chalk.gray(codeFix.split('\n').map(l => `  ${l}`).join('\n')));
       }
       console.log('');
-      console.log(chalk.gray(`Model: ${analysis.model}`));
-      if (analysis.tokensUsed) {
-        console.log(chalk.gray(`Tokens: ${analysis.tokensUsed}`));
-      }
+      console.log(chalk.gray(`Model: ${analysis.model} • Tokens: ${analysis.tokensUsed || 'N/A'}`));
     } catch (error) {
       console.log(chalk.yellow('⚠️  LLM analysis failed:'));
       console.log(chalk.gray(`   ${(error as Error).message}`));
-      console.log('');
-      console.log(chalk.gray('Falling back to rule-based analysis...'));
     }
   }
   
-  console.log(chalk.gray('─'.repeat(50)));
+  console.log(chalk.gray('─'.repeat(60)));
+  console.log(chalk.gray('📄 COMPRESSED ERROR OUTPUT'));
+  console.log(chalk.gray('─'.repeat(60)));
   console.log('');
-  console.log(chalk.gray('Full error output:'));
-  console.log('');
-  console.log(chalk.gray(errorText));
+  console.log(chalk.white(compressedOutput));
   console.log('');
   
-  // Output to file if requested
   if (options.output) {
     const fs = await import('fs');
-    fs.writeFileSync(options.output, errorText);
-    console.log(chalk.green(`✅ Error output saved to: ${options.output}`));
+    fs.writeFileSync(options.output, compressedOutput);
+    console.log(chalk.green(`✅ Saved to: ${options.output}`));
   }
+}
+
+interface CompressionStats {
+  originalLines: number;
+  compressedLines: number;
+  uniqueErrors: number;
+  thirdPartyCollapsed: number;
+}
+
+function smartCompress(errorText: string, options: { gitAware?: boolean }): { compressedOutput: string; compressionStats: CompressionStats } {
+  const lines = errorText.split('\n');
+  const originalLines = lines.length;
+  
+  // Third-party patterns to collapse
+  const thirdPartyPatterns = [
+    'node_modules',
+    'site-packages',
+    '.cargo/registry',
+    '__pycache__',
+    'node:internal',
+    'node:module',
+  ];
+  
+  const compressedLines: string[] = [];
+  let inThirdParty = false;
+  let thirdPartyCount = 0;
+  let collapsedFrames = 0;
+  
+  for (const line of lines) {
+    const isThirdParty = thirdPartyPatterns.some(p => line.includes(p));
+    
+    if (isThirdParty) {
+      if (!inThirdParty) {
+        inThirdParty = true;
+        collapsedFrames = 1;
+      } else {
+        collapsedFrames++;
+      }
+      thirdPartyCount++;
+    } else {
+      if (inThirdParty && collapsedFrames > 0) {
+        compressedLines.push(chalk.gray(`  [...${collapsedFrames} third-party frames collapsed]`));
+        inThirdParty = false;
+        collapsedFrames = 0;
+      }
+      compressedLines.push(line);
+    }
+  }
+  
+  if (inThirdParty && collapsedFrames > 0) {
+    compressedLines.push(chalk.gray(`  [...${collapsedFrames} third-party frames collapsed]`));
+  }
+  
+  // Deduplicate similar error lines
+  const errorPattern = /^(src\/[^(]+)\((\d+),(\d+)\):\s*(error\s+\w+):\s*(.+)$/;
+  const errorMap = new Map<string, { count: number; locations: string[] }>();
+  
+  const finalLines: string[] = [];
+  const outputLines: string[] = [];
+  
+  for (const line of compressedLines) {
+    const match = line.match(errorPattern);
+    if (match) {
+      const [, file, lineNum, col, errorType, message] = match;
+      const key = `${errorType}: ${message}`;
+      if (errorMap.has(key)) {
+        const existing = errorMap.get(key)!;
+        existing.count++;
+        existing.locations.push(`${file}:${lineNum}`);
+      } else {
+        errorMap.set(key, { count: 1, locations: [`${file}:${lineNum}`] });
+      }
+    } else {
+      outputLines.push(line);
+    }
+  }
+  
+  // Output deduplicated errors
+  for (const [key, data] of errorMap.entries()) {
+    const locs = data.locations.length <= 3 
+      ? data.locations.join(', ')
+      : `${data.locations.slice(0, 3).join(', ')} (+${data.locations.length - 3} more)`;
+    outputLines.push(`${chalk.yellow(`[${data.count}x]`)} ${key}`);
+    outputLines.push(chalk.gray(`    Locations: ${locs}`));
+  }
+  
+  const compressedOutput = outputLines.join('\n');
+  const compressedLineCount = outputLines.length;
+  
+  return {
+    compressedOutput,
+    compressionStats: {
+      originalLines,
+      compressedLines: compressedLineCount,
+      uniqueErrors: errorMap.size,
+      thirdPartyCollapsed: thirdPartyCount,
+    },
+  };
 }
 
 interface CommandResult {
@@ -172,27 +278,23 @@ interface CommandResult {
   code: number;
 }
 
-function executeCommand(commandStr: string): Promise<CommandResult> {
+function executeCommandSilent(commandStr: string): Promise<CommandResult> {
   return new Promise((resolve) => {
     const [cmd, ...args] = commandStr.split(' ');
     const child = spawn(cmd, args, {
       shell: true,
-      stdio: ['inherit', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     
     let stdout = '';
     let stderr = '';
     
     child.stdout?.on('data', (data) => {
-      const text = data.toString();
-      stdout += text;
-      process.stdout.write(text);
+      stdout += data.toString();
     });
     
     child.stderr?.on('data', (data) => {
-      const text = data.toString();
-      stderr += text;
-      process.stderr.write(chalk.gray(text));
+      stderr += data.toString();
     });
     
     child.on('close', (code) => {
