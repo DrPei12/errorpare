@@ -32,11 +32,10 @@ async function initializeErrorPare(options: InitOptions): Promise<void> {
   const configManager = new ConfigManager();
   
   console.log('');
-  console.log(chalk.cyan('🦞 ErrorPare Configuration Wizard'));
-  console.log(chalk.gray('===================================='));
+  console.log(chalk.cyan('⬡ ErrorPare Configuration Wizard'));
+  console.log(chalk.gray('══════════════════════════════════════════'));
   console.log('');
   
-  // Check if config already exists
   if (configManager.exists() && !options.force) {
     console.log(chalk.yellow('⚠️  Configuration already exists at:'), configManager.getConfigPath());
     console.log(chalk.gray('   Use --force to overwrite'));
@@ -54,7 +53,7 @@ async function initializeErrorPare(options: InitOptions): Promise<void> {
   }
   
   const config: any = {
-    version: '2.0.0',
+    version: '2.0.1',
     mode: 'basic',
     settings: {
       maxLines: 1000,
@@ -67,7 +66,6 @@ async function initializeErrorPare(options: InitOptions): Promise<void> {
     },
   };
   
-  // Mode selection
   if (options.analyze) {
     config.mode = 'analyze';
     console.log(chalk.cyan('📊 Mode: Analyze (LLM-powered root cause analysis)'));
@@ -78,10 +76,9 @@ async function initializeErrorPare(options: InitOptions): Promise<void> {
   
   console.log('');
   
-  // LLM Configuration (if analyze mode)
   if (config.mode === 'analyze') {
     console.log(chalk.cyan('🔧 LLM Configuration'));
-    console.log(chalk.gray('-------------------'));
+    console.log(chalk.gray('──────────────────────────────────────────'));
     
     const provider = options.provider || await promptLLMProvider();
     const llmConfig = await configureLLM(provider);
@@ -89,12 +86,11 @@ async function initializeErrorPare(options: InitOptions): Promise<void> {
     console.log('');
   }
   
-  // Save configuration
   configManager.update(config);
   configManager.save();
   
   console.log('');
-  console.log(chalk.green('✅ Configuration complete!'));
+  console.log(chalk.green('⬡ Configuration complete!'));
   console.log('');
   console.log(chalk.cyan('Usage:'));
   console.log(chalk.gray('   errorpare run "npm run build"           # Basic compression'));
@@ -123,7 +119,6 @@ async function promptLLMProvider(): Promise<string> {
   });
   console.log('');
   
-  // For now, default to bailian
   console.log(chalk.gray('(Auto-selecting 阿里云百炼 for demo)'));
   return 'bailian';
 }
@@ -133,7 +128,6 @@ async function configureLLM(provider: string): Promise<LLMConfig> {
   console.log(chalk.gray(`Configuring ${provider}...`));
   console.log('');
   
-  // Provider configurations
   const providerConfigs: Record<string, { model: string; baseUrl?: string; envVar: string }> = {
     bailian: {
       model: 'qwen-plus',
@@ -162,7 +156,6 @@ async function configureLLM(provider: string): Promise<LLMConfig> {
   
   const providerConfig = providerConfigs[provider] || providerConfigs.bailian;
   
-  // Try to get API key from environment
   const apiKey = process.env[providerConfig.envVar];
   
   if (!apiKey) {
@@ -170,7 +163,6 @@ async function configureLLM(provider: string): Promise<LLMConfig> {
     console.log(chalk.gray(`   Set ${providerConfig.envVar} environment variable`));
     console.log(chalk.gray('   Or enter API key now:'));
     console.log('');
-    // For CLI, we'll prompt interactively in full implementation
     throw new Error('API key required. Set environment variable or run interactively.');
   }
   

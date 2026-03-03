@@ -11,7 +11,7 @@ const CONFIG_DIR = join(homedir(), '.errorpare');
 const CONFIG_FILE = join(CONFIG_DIR, 'config.json');
 
 console.log('');
-console.log('🦞 ErrorPare Postinstall');
+console.log('⬡ ErrorPare Postinstall');
 console.log('════════════════════════════════════════');
 console.log('');
 
@@ -24,7 +24,7 @@ if (existsSync(CONFIG_FILE)) {
   process.exit(0);
 }
 
-console.log('🎉 ErrorPare v2.0.0 installed successfully!');
+console.log('🎉 ErrorPare v2.0.1 installed successfully!');
 console.log('');
 console.log('Would you like to run the setup wizard now? (y/n) [default: y]');
 console.log('');
@@ -57,7 +57,7 @@ process.stdin.on('data', (key) => {
       const child = spawn('errorpare', ['init'], { stdio: 'inherit', shell: true });
       child.on('close', (code) => {
         if (code === 0) {
-          console.log('\n✅ Setup complete!\n');
+          console.log('\n⬡ Setup complete!\n');
           console.log('Quick start:');
           console.log('  errorpare run "npm run build"           # Basic compression');
           console.log('  errorpare run "npm run build" --analyze # With AI analysis\n');
