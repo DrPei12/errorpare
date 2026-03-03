@@ -1,6 +1,6 @@
-// ErrorPare - Constants
+// ErrorPare - Constants (Phase 2)
 
-export const ERRORPARE_VERSION = '1.0.0';
+export const ERRORPARE_VERSION = '2.0.0';
 
 export const EXIT_CODES = {
   SUCCESS: 0,
@@ -13,7 +13,7 @@ export const MAX_LINES = 1000;
 export const MAX_MEMORY_MB = 100;
 
 export const CLI_NAME = 'errorpare';
-export const CLI_DESCRIPTION = 'AI报错压缩工具 - 让Claude/Gemini更高效';
+export const CLI_DESCRIPTION = 'AI 报错压缩工具 - 让 Claude/Gemini 更高效';
 
 export const CONFIG_FILES = {
   CURSOR: '.cursorrules',
