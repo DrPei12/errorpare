@@ -7,6 +7,18 @@ import * as os from 'os';
 import chalk from 'chalk';
 import { ConfigManager, LLMConfig } from '../../core/config/config-manager.js';
 
+const LOGO = `
+╔═══════════════════════════════════════════╗
+║    ███████╗██╗ ██████╗███████╗██╗      ║
+║    ██╔════╝██║██╔════╝██╔════╝██║      ║
+║    █████╗  ██║██║     █████╗  ██║      ║
+║    ██╔══╝  ██║██║     ██╔══╝  ██║      ║
+║    ██║     ██║╚██████╗███████╗███████╗ ║
+║    ╚═╝     ╚═╝ ╚═════╝╚══════╝╚══════╝ ║
+║              E R R O R P A R E           ║
+╚═══════════════════════════════════════════╝
+`;
+
 interface InitOptions {
   force?: boolean;
   analyze?: boolean;
@@ -31,8 +43,9 @@ export function createInitCommand(): Command {
 async function initializeErrorPare(options: InitOptions): Promise<void> {
   const configManager = new ConfigManager();
   
+  console.log(LOGO);
   console.log('');
-  console.log(chalk.cyan('⬡ ErrorPare Configuration Wizard'));
+  console.log(chalk.cyan('📦 Configuration Wizard'));
   console.log(chalk.gray('══════════════════════════════════════════'));
   console.log('');
   
@@ -53,7 +66,7 @@ async function initializeErrorPare(options: InitOptions): Promise<void> {
   }
   
   const config: any = {
-    version: '2.0.1',
+    version: '2.0.2',
     mode: 'basic',
     settings: {
       maxLines: 1000,
@@ -90,7 +103,7 @@ async function initializeErrorPare(options: InitOptions): Promise<void> {
   configManager.save();
   
   console.log('');
-  console.log(chalk.green('⬡ Configuration complete!'));
+  console.log(chalk.green('✅ Configuration complete!'));
   console.log('');
   console.log(chalk.cyan('Usage:'));
   console.log(chalk.gray('   errorpare run "npm run build"           # Basic compression'));
