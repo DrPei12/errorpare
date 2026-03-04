@@ -2,7 +2,7 @@
 
 <div align="center">
 
-![ErrorPare Logo](docs/logo.png?raw=true&width=200)
+![ErrorPare Logo](https://raw.githubusercontent.com/DrPei12/errorpare/main/docs/logo.png)
 
 **LLM 报错信息压缩工具 | 减少 Token 消耗 | 提升调试效率**
 
