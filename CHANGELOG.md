@@ -1,5 +1,28 @@
 # Changelog
 
+## [2.0.6] - 2026-03-04
+
+### Changed
+- **README** - Improved structure with GitHub admonitions and cleaner formatting
+- **Documentation** - Added FAQ section and LLM configuration quick reference
+- **Emoji Usage** - Reduced for more professional appearance
+
+### Added
+- **npm downloads badge** - Display weekly download statistics
+- **Security notes** - Added safety information for LLM analysis
+
+### Technical
+- README.md: 150 lines added, 185 lines removed (net -35 lines)
+
+---
+
+## [2.0.5] - 2026-03-04
+
+### Fixed
+- **npm Logo** - Use absolute GitHub URL for logo display on npmjs.com
+
+---
+
 ## [2.0.0] - 2026-03-03
 
 ### Added
