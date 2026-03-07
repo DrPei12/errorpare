@@ -5,6 +5,7 @@ import { applyGitAwareFilter } from './filters/git-aware.js';
 import { deduplicateErrors, limitLines } from './filters/deduplicator.js';
 import { parseStackTrace, stackTraceToCompressed, splitPythonTracebacks, type ParsedStackTrace, type StackFrame } from './parsers/stack-trace.js';
 import { readContexts } from './context/context-reader.js';
+import { SourceMapResolver, getFrameDisplayLocation, getFrameGeneratedLocation } from './source-maps/source-map-resolver.js';
 import type { CompressionResult, ErrorPareOptions, ProgrammingLanguage, CompressedError } from '../types/index.js';
 import { DEFAULT_OPTIONS } from '../types/index.js';
 
@@ -80,9 +81,13 @@ interface CodeSnippetLike {
 
 export class Compressor {
   private options: ErrorPareOptions;
+  private sourceMapResolver: SourceMapResolver;
   
   constructor(options: ErrorPareOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
+    this.sourceMapResolver = new SourceMapResolver({
+      projectRoot: this.options.projectRoot || process.cwd(),
+    });
   }
   
   detectLanguage(content: string): ProgrammingLanguage {
@@ -121,9 +126,9 @@ export class Compressor {
     const errorType = parsed.type || 'Error';
     
     const firstBusinessFrame = parsed.frames.find((f: any) => !f.isThirdParty);
-    const location = firstBusinessFrame 
-      ? `${firstBusinessFrame.file}:${firstBusinessFrame.line}`
-      : (parsed.frames[0] ? `${parsed.frames[0].file}:${parsed.frames[0].line}` : undefined);
+    const displayFrame = firstBusinessFrame || parsed.frames[0];
+    const location = displayFrame ? getFrameDisplayLocation(displayFrame) : undefined;
+    const originalLocation = displayFrame ? getFrameGeneratedLocation(displayFrame) : undefined;
     
     return {
       count: 1,
@@ -132,6 +137,7 @@ export class Compressor {
       template: mainError.template,
       variables: mainError.variables,
       location,
+      originalLocation,
     };
   }
   
@@ -142,11 +148,14 @@ export class Compressor {
     const limited = options.maxLines ? limitLines(input, options.maxLines) : input;
     const originalLines = limited.split('\n').length;
     const language = options.language || this.detectLanguage(limited);
+    const shouldRestoreSourceMaps =
+      options.sourceMaps !== false &&
+      (language === 'javascript' || language === 'typescript' || language === 'unknown');
     
     let filtered = limited;
     let thirdPartyCollapsed = 0;
     
-    if (options.gitAware) {
+    if (options.gitAware && !shouldRestoreSourceMaps) {
       const projectRoot = options.projectRoot || process.cwd();
       const { filtered: gitFiltered, stats } = applyGitAwareFilter(limited, { projectRoot, language });
       filtered = gitFiltered;
@@ -156,6 +165,7 @@ export class Compressor {
     const dedupStart = Date.now();
     let parsedStackTraces: ParsedStackTrace[] = [];
     let thirdPartyCount = 0;
+    let sourceMappedFrames = 0;
     
     if (language === 'python') {
       const tracebackBlocks = splitPythonTracebacks(filtered);
@@ -178,6 +188,13 @@ export class Compressor {
       }
       if (parsedStackTraces.length === 0) {
         parsedStackTraces.push(parseStackTrace(filtered, language));
+      }
+    }
+
+    if (shouldRestoreSourceMaps) {
+      for (const parsed of parsedStackTraces) {
+        const restored = await this.sourceMapResolver.restoreParsedStackTrace(parsed);
+        sourceMappedFrames += restored.restoredFrames;
       }
     }
     
@@ -222,6 +239,7 @@ export class Compressor {
         rate,
         uniqueErrors: mergedErrors.length,
         thirdPartyCollapsed: thirdPartyCollapsed > 0 ? thirdPartyCollapsed : undefined,
+        sourceMappedFrames: sourceMappedFrames > 0 ? sourceMappedFrames : undefined,
       },
       errors: mergedErrors,
       summary,
@@ -288,6 +306,14 @@ export class Compressor {
             existing.location = `${existing.location}, ${error.location}`;
           }
         }
+
+        if (error.originalLocation && error.originalLocation !== existing.originalLocation) {
+          if (!existing.originalLocation?.includes(error.originalLocation)) {
+            existing.originalLocation = existing.originalLocation
+              ? `${existing.originalLocation}, ${error.originalLocation}`
+              : error.originalLocation;
+          }
+        }
       } else {
         errorMap.set(key, { ...error });
       }
@@ -318,6 +344,9 @@ export class Compressor {
     if (result.compression.thirdPartyCollapsed) {
       lines.push(`[ErrorPare] Git-aware trimming: ${result.compression.thirdPartyCollapsed} third-party frames collapsed`);
     }
+    if (result.compression.sourceMappedFrames) {
+      lines.push(`[ErrorPare] Source maps restored: ${result.compression.sourceMappedFrames} frame(s)`);
+    }
     lines.push(`[ErrorPare] Compression: ${Math.round(result.compression.rate * 100)}% (${result.compression.originalLines} → ${result.compression.compressedLines} lines)`);
     lines.push('');
     lines.push('═══════════════════════════════════════════════════════════════');
@@ -325,6 +354,7 @@ export class Compressor {
     for (const error of result.errors) {
       lines.push(`[${error.count}x] ${error.type}: ${error.message}`);
       if (error.location) lines.push(`  Location: ${error.location}`);
+      if (error.originalLocation) lines.push(`  Generated: ${error.originalLocation}`);
       if (error.variables.length > 0) {
         lines.push(`  Variables: ${error.variables.map(v => `${v.name}=${v.value}`).join(', ')}`);
       }

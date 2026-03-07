@@ -15,6 +15,13 @@ export interface StackFrame {
   column?: number;
   method?: string;
   isThirdParty: boolean;
+  originalFile?: string;
+  originalLine?: number;
+  originalColumn?: number;
+  sourceContent?: string | null;
+  sourceMapPath?: string;
+  sourceMapName?: string;
+  sourceMapChainDepth?: number;
 }
 
 /**

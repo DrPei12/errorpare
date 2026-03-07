@@ -53,6 +53,42 @@ async function isBinaryFile(filePath: string): Promise<boolean> {
   }
 }
 
+function buildContextFromContent(
+  frame: StackFrame,
+  content: string,
+  contextLines: number
+): CodeContext | null {
+  const lines = content.split('\n');
+
+  if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) {
+    return null;
+  }
+
+  const targetLine = frame.line;
+  if (targetLine < 1 || targetLine > lines.length) {
+    return null;
+  }
+
+  const startLine = Math.max(1, targetLine - contextLines);
+  const endLine = Math.min(lines.length, targetLine + contextLines);
+  const snippet: CodeSnippetLine[] = [];
+
+  for (let i = startLine; i <= endLine; i++) {
+    snippet.push({
+      line: i,
+      code: lines[i - 1],
+      highlight: i === targetLine,
+    });
+  }
+
+  return {
+    file: frame.file,
+    line: targetLine,
+    column: frame.column,
+    snippet,
+  };
+}
+
 /**
  * Validate that the file path is within the project root (security check)
  */
@@ -85,6 +121,13 @@ export async function readContext(
   const projectRoot = opts.projectRoot;
 
   try {
+    if (typeof frame.sourceContent === 'string') {
+      const inlineContext = buildContextFromContent(frame, frame.sourceContent, contextLines);
+      if (inlineContext) {
+        return inlineContext;
+      }
+    }
+
     // Validate file path for security
     if (!isPathSafe(frame.file, projectRoot)) {
       console.warn(`[ContextReader] Security: File ${frame.file} is outside project root`);
@@ -110,40 +153,13 @@ export async function readContext(
 
     // Read file content
     const content = await fs.readFile(frame.file, 'utf-8');
-    const lines = content.split('\n');
-
-    // Handle empty files
-    if (lines.length === 0 || (lines.length === 1 && lines[0] === '')) {
+    const context = buildContextFromContent(frame, content, contextLines);
+    if (!context) {
+      console.warn(`[ContextReader] Line ${frame.line} out of bounds (file has ${content.split('\n').length} lines)`);
       return null;
     }
 
-    // Validate line number
-    const targetLine = frame.line;
-    if (targetLine < 1 || targetLine > lines.length) {
-      console.warn(`[ContextReader] Line ${targetLine} out of bounds (file has ${lines.length} lines)`);
-      return null;
-    }
-
-    // Calculate snippet range
-    const startLine = Math.max(1, targetLine - contextLines);
-    const endLine = Math.min(lines.length, targetLine + contextLines);
-
-    // Build snippet
-    const snippet: CodeSnippetLine[] = [];
-    for (let i = startLine; i <= endLine; i++) {
-      snippet.push({
-        line: i,
-        code: lines[i - 1], // Array is 0-indexed, lines are 1-indexed
-        highlight: i === targetLine,
-      });
-    }
-
-    return {
-      file: frame.file,
-      line: targetLine,
-      column: frame.column,
-      snippet,
-    };
+    return context;
   } catch (error) {
     console.warn(`[ContextReader] Failed to read context for ${frame.file}:${frame.line}:`, error);
     return null;

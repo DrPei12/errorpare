@@ -13,6 +13,10 @@ export interface ErrorPareOptions {
   language?: ProgrammingLanguage;
   /** Project root directory */
   projectRoot?: string;
+  /** Number of context lines to show around errors (default: 5, max: 20) */
+  contextLines?: number;
+  /** Restore stack frames with source maps when available */
+  sourceMaps?: boolean;
 }
 
 export type ProgrammingLanguage = 
@@ -43,10 +47,24 @@ export interface CompressionResult {
     rate: number;
     uniqueErrors: number;
     thirdPartyCollapsed?: number;
+    sourceMappedFrames?: number;
   };
   errors: CompressedError[];
   summary: string;
   llmAnalysis?: LLMAnalysis;
+}
+
+export interface CodeSnippetLine {
+  line: number;
+  code: string;
+  highlight: boolean;
+}
+
+export interface CodeContext {
+  file: string;
+  line: number;
+  column?: number;
+  snippet: CodeSnippetLine[];
 }
 
 export interface CompressedError {
@@ -55,8 +73,10 @@ export interface CompressedError {
   message: string;
   template: string;
   location?: string;
+  originalLocation?: string;
   variables: Variable[];
   suggestion?: string;
+  context?: CodeContext;
 }
 
 export interface Variable {
@@ -76,6 +96,9 @@ export interface StackFrame {
   line: number;
   column: number;
   method?: string;
+  originalFile?: string;
+  originalLine?: number;
+  originalColumn?: number;
 }
 
 export interface ExecutionResult {
@@ -104,4 +127,6 @@ export const DEFAULT_OPTIONS: ErrorPareOptions = {
   gitAware: true,
   analyze: false,
   output: 'text',
+  contextLines: 0, // Disabled by default - enable with --context-lines when needed
+  sourceMaps: true,
 };

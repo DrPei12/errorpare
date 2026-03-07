@@ -83,6 +83,16 @@ echo "TypeError: x is undefined" | errorpare compress -
 [80 frames collapsed: node_modules, site-packages, etc.]
 ```
 
+### Source Map 堆栈还原
+
+对于 TypeScript / Vite / Webpack / esbuild / tsc 生成的 JavaScript 报错，ErrorPare 会自动尝试发现 `.map` 文件或内联 `data:` source map，并把 `dist/*.js` 堆栈还原回原始源码位置。
+
+```bash
+[1x] TypeError: Cannot read properties of undefined
+  Location: src/services/user.ts:42:11
+  Generated: dist/assets/index.js:1:28492
+```
+
 ### 变量遮蔽
 
 自动替换敏感值和变化值，提高去重率。
@@ -251,6 +261,34 @@ errorpare init --analyze --provider deepseek
 | DeepSeek | deepseek-chat | ERRORPARE_DEEPSEEK_API_KEY |
 | OpenAI | gpt-4o-mini | ERRORPARE_OPENAI_API_KEY |
 | Anthropic | claude-3-5-sonnet | ERRORPARE_ANTHROPIC_API_KEY |
+
+---
+
+## MCP 集成
+
+ErrorPare 提供独立的 MCP Server，可直接被 Claude Desktop、Cursor 等客户端调用。
+
+```bash
+npx errorpare-mcp
+```
+
+可用工具：
+
+- `run_command`
+- `compress_errors`
+- `analyze_errors`
+
+可用资源：
+
+- `errorpare://docs/mcp-integration`
+- `errorpare://docs/claude-desktop`
+- `errorpare://docs/cursor`
+
+配置文档：
+
+- [MCP 集成总览](docs/MCP_INTEGRATION.md)
+- [Claude Desktop 配置](docs/MCP_CLAUDE_DESKTOP.md)
+- [Cursor 配置](docs/MCP_CURSOR.md)
 
 ---
 

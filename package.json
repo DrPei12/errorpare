@@ -9,7 +9,8 @@
   },
   "files": [
     "dist",
-    "skill"
+    "skill",
+    "docs"
   ],
   "scripts": {
     "build": "tsup src --dts",
