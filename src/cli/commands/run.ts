@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import { ConfigManager } from '../../core/config/config-manager.js';
 import { RuleEngine } from '../../core/rules/rule-engine.js';
 import { LLMAnalyzer } from '../../core/analysis/llm/llm-analyzer.js';
+import { Compressor } from '../../core/compressor.js';
 
 interface RunOptions {
   analyze?: boolean;
@@ -13,6 +14,7 @@ interface RunOptions {
   json?: boolean;
   output?: string;
   noCompress?: boolean;
+  contextLines?: number;
 }
 
 export function createRunCommand(): Command {
@@ -26,6 +28,7 @@ export function createRunCommand(): Command {
     .option('--json', 'Output in JSON format')
     .option('--no-compress', 'Skip compression, show raw output')
     .option('-o, --output <file>', 'Write output to file')
+    .option('--context-lines <n>', 'Show N lines of code context around errors (0 to disable, max 20)', '0')
     .action(async (cmd: string, options: RunOptions) => {
       await runCommand(cmd, options);
     });
@@ -60,10 +63,24 @@ async function runCommand(commandStr: string, options: RunOptions): Promise<void
     return;
   }
   
-  // Smart compression
-  const { compressedOutput, compressionStats } = smartCompress(errorText, {
+  // Smart compression with optional context appending
+  const contextLinesValue = typeof options.contextLines === 'string' ? options.contextLines : '0';
+  const parsedContextLines = Number.parseInt(contextLinesValue, 10);
+  const contextLines = Number.isNaN(parsedContextLines) ? 0 : parsedContextLines;
+  const compressor = new Compressor({
     gitAware: config.settings.gitAware,
+    contextLines: contextLines > 0 ? Math.min(contextLines, 20) : 0,
+    projectRoot: process.cwd(),
   });
+  
+  const compressResult = await compressor.compress(errorText, commandStr, result.code);
+  const compressedOutput = compressor.formatAsText(compressResult);
+  const compressionStats = {
+    originalLines: compressResult.compression.originalLines,
+    compressedLines: compressResult.compression.compressedLines,
+    uniqueErrors: compressResult.compression.uniqueErrors,
+    thirdPartyCollapsed: compressResult.compression.thirdPartyCollapsed,
+  };
   
   const ruleEngine = new RuleEngine();
   const matches = ruleEngine.match(errorText);
@@ -72,8 +89,11 @@ async function runCommand(commandStr: string, options: RunOptions): Promise<void
     const output = {
       success: false,
       exitCode: result.code,
-      compression: compressionStats,
-      error: compressedOutput,
+      command: commandStr,
+      compression: compressResult.compression,
+      summary: compressResult.summary,
+      errors: compressResult.errors,
+      formatted: compressedOutput,
       matches: matches.map(m => ({
         ruleId: m.rule.id,
         name: m.rule.name,

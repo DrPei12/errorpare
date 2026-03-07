@@ -1,13 +1,82 @@
 // ErrorPare - Main Compressor
 
+import chalk from 'chalk';
 import { applyGitAwareFilter } from './filters/git-aware.js';
 import { deduplicateErrors, limitLines } from './filters/deduplicator.js';
-import { parseStackTrace, stackTraceToCompressed, splitPythonTracebacks, type ParsedStackTrace } from './parsers/stack-trace.js';
-import type { CompressionResult, ErrorPareOptions, ProgrammingLanguage } from '../types/index.js';
+import { parseStackTrace, stackTraceToCompressed, splitPythonTracebacks, type ParsedStackTrace, type StackFrame } from './parsers/stack-trace.js';
+import { readContexts } from './context/context-reader.js';
+import type { CompressionResult, ErrorPareOptions, ProgrammingLanguage, CompressedError } from '../types/index.js';
 import { DEFAULT_OPTIONS } from '../types/index.js';
 
 export { Drain3Miner } from './filters/drain3.js';
 export { parseStackTrace, stackTraceToCompressed, splitPythonTracebacks } from './parsers/stack-trace.js';
+export { readContexts } from './context/context-reader.js';
+
+const snippetChalk = new chalk.Instance({ level: 1 });
+
+const JAVASCRIPT_KEYWORDS = new Set([
+  'async', 'await', 'break', 'case', 'catch', 'class', 'const', 'continue', 'debugger', 'default',
+  'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if',
+  'implements', 'import', 'in', 'instanceof', 'interface', 'let', 'new', 'null', 'private', 'protected',
+  'public', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'type', 'typeof',
+  'undefined', 'var', 'void', 'while', 'yield', 'from', 'as', 'readonly', 'declare', 'module'
+]);
+
+const PYTHON_KEYWORDS = new Set([
+  'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else',
+  'except', 'False', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'None',
+  'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield'
+]);
+
+function getErrorMergeKey(error: Pick<CompressedError, 'template' | 'message'>): string {
+  return error.template || error.message.substring(0, 100);
+}
+
+function getKeywordSet(language: ProgrammingLanguage): Set<string> {
+  if (language === 'python') {
+    return PYTHON_KEYWORDS;
+  }
+
+  return JAVASCRIPT_KEYWORDS;
+}
+
+function highlightCode(code: string, language: ProgrammingLanguage): string {
+  const keywords = getKeywordSet(language);
+
+  return code.replace(/\b[A-Za-z_][A-Za-z0-9_]*\b/g, token => {
+    if (!keywords.has(token)) {
+      return token;
+    }
+
+    return snippetChalk.blueBright(token);
+  });
+}
+
+export function formatHighlightedSnippet(
+  snippet: CodeSnippetLike[],
+  language: ProgrammingLanguage = 'unknown'
+): string[] {
+  if (snippet.length === 0) {
+    return [];
+  }
+
+  const maxLineNum = Math.max(...snippet.map(line => line.line));
+  const lineNumWidth = Math.max(4, maxLineNum.toString().length);
+
+  return snippet.map(snippetLine => {
+    const marker = snippetLine.highlight ? snippetChalk.red('>') : snippetChalk.gray(' ');
+    const lineNum = snippetChalk.cyan(String(snippetLine.line).padStart(lineNumWidth, ' '));
+    const separator = snippetChalk.gray(' | ');
+    const code = highlightCode(snippetLine.code, language);
+    return `${marker} ${lineNum}${separator}${code}`;
+  });
+}
+
+interface CodeSnippetLike {
+  line: number;
+  code: string;
+  highlight: boolean;
+}
 
 export class Compressor {
   private options: ErrorPareOptions;
@@ -66,7 +135,7 @@ export class Compressor {
     };
   }
   
-  compress(input: string, command?: string, exitCode: number = 0): CompressionResult {
+  async compress(input: string, command?: string, exitCode: number = 0): Promise<CompressionResult> {
     const startTime = Date.now();
     const options = this.options;
     
@@ -115,11 +184,27 @@ export class Compressor {
     if (thirdPartyCount > 0) thirdPartyCollapsed = thirdPartyCount;
     
     const compressedErrors: CompressionResult['errors'] = [];
+    const mergeKeyToFrame = new Map<string, StackFrame>();
+
     for (const parsed of parsedStackTraces) {
-      compressedErrors.push(this.compressStackTrace(parsed, language));
+      const compressedError = this.compressStackTrace(parsed, language);
+      compressedErrors.push(compressedError);
+
+      const relevantFrame = parsed.frames.find(frame => !frame.isThirdParty) || parsed.frames[0];
+      const mergeKey = getErrorMergeKey(compressedError);
+      if (relevantFrame && !mergeKeyToFrame.has(mergeKey)) {
+        mergeKeyToFrame.set(mergeKey, relevantFrame);
+      }
     }
     
     const mergedErrors = this.mergeErrors(compressedErrors);
+    
+    // Enrich errors with code context if enabled
+    const contextLines = Math.min(Math.max(0, options.contextLines ?? 5), 20);
+    if (contextLines > 0) {
+      await this.enrichErrorsWithContext(mergedErrors, mergeKeyToFrame, contextLines);
+    }
+    
     const compressionTime = Date.now() - dedupStart;
     const totalOriginal = parsedStackTraces.length || 1;
     const rate = totalOriginal > 0 ? Math.max(0, (totalOriginal - mergedErrors.length) / totalOriginal) : 0;
@@ -143,11 +228,45 @@ export class Compressor {
     };
   }
   
+  private async enrichErrorsWithContext(
+    errors: CompressedError[],
+    mergeKeyToFrame: Map<string, StackFrame>,
+    contextLines: number
+  ): Promise<void> {
+    const projectRoot = this.options.projectRoot || process.cwd();
+    const pendingFrames = errors
+      .map(error => ({
+        error,
+        frame: mergeKeyToFrame.get(getErrorMergeKey(error)),
+      }))
+      .filter((entry): entry is { error: CompressedError; frame: StackFrame } => entry.frame !== undefined);
+
+    if (pendingFrames.length === 0) {
+      return;
+    }
+
+    const contexts = await Promise.all(
+      pendingFrames.map(({ frame }) =>
+        readContexts([frame], {
+          projectRoot,
+          contextLines,
+        }).then(results => results[0] ?? null)
+      )
+    );
+
+    pendingFrames.forEach(({ error }, index) => {
+      const context = contexts[index];
+      if (context) {
+        error.context = context;
+      }
+    });
+  }
+  
   private mergeErrors(errors: CompressionResult['errors']): CompressionResult['errors'] {
     const errorMap = new Map<string, CompressionResult['errors'][0]>();
     
     for (const error of errors) {
-      const key = error.template || error.message.substring(0, 100);
+      const key = getErrorMergeKey(error);
       
       if (errorMap.has(key)) {
         const existing = errorMap.get(key)!;
@@ -182,7 +301,7 @@ export class Compressor {
     if (thirdPartyCollapsed > 0) parts.push(`${thirdPartyCollapsed} third-party frames collapsed`);
     if (errors.length > 0) {
       const totalCount = errors.reduce((sum, e) => sum + e.count, 0);
-      const topError = errors.sort((a, b) => b.count - a.count)[0];
+      const topError = [...errors].sort((a, b) => b.count - a.count)[0];
       parts.push(`${errors.length} unique errors from ${totalCount} occurrences`);
       parts.push(`Most common: ${topError.type} (${topError.count}x)`);
     } else {
@@ -193,6 +312,8 @@ export class Compressor {
   
   formatAsText(result: CompressionResult): string {
     const lines: string[] = [];
+    const language = this.options.language || 'unknown';
+
     lines.push(`[ErrorPare] ${result.command} ${result.exitCode === 0 ? 'succeeded' : 'failed'} (exit code ${result.exitCode})`);
     if (result.compression.thirdPartyCollapsed) {
       lines.push(`[ErrorPare] Git-aware trimming: ${result.compression.thirdPartyCollapsed} third-party frames collapsed`);
@@ -208,6 +329,18 @@ export class Compressor {
         lines.push(`  Variables: ${error.variables.map(v => `${v.name}=${v.value}`).join(', ')}`);
       }
       if (error.suggestion) lines.push(`  → ${error.suggestion}`);
+      
+      if (error.context && error.context.snippet.length > 0) {
+        lines.push('');
+        lines.push('  Code Context:');
+        lines.push(`  ${error.context.file}:${error.context.line}`);
+        lines.push('  ```');
+        for (const highlightedLine of formatHighlightedSnippet(error.context.snippet, language)) {
+          lines.push(`  ${highlightedLine}`);
+        }
+        lines.push('  ```');
+      }
+      
       lines.push('');
     }
     lines.push('═══════════════════════════════════════════════════════════════');
@@ -217,7 +350,7 @@ export class Compressor {
   }
 }
 
-export function compress(input: string, options?: ErrorPareOptions): CompressionResult {
+export async function compress(input: string, options?: ErrorPareOptions): Promise<CompressionResult> {
   const compressor = new Compressor(options);
   return compressor.compress(input);
 }
