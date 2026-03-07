@@ -1,5 +1,57 @@
 # Changelog
 
+## [2.1.0] - 2026-03-07
+
+### Added
+- **Phase 2.5: Context Appending** - Automatically attach code context around error locations
+  - `--context-lines` flag to control context size (default: 5, max: 20)
+  - Syntax-highlighted code snippets in CLI output
+  - Full context in JSON output (`errors[].context`)
+
+- **Phase 2.5: Source Map Support** - Restore stack frames to original source locations
+  - VLQ encoding/decoding for source map parsing
+  - Inline data URL source map support
+  - External `.map` file auto-discovery
+  - Multi-chain restoration (ts→js→min.js)
+  - LRU caching for performance
+  - `--source-maps` flag (enabled by default)
+
+- **New Type Fields**:
+  - `ErrorPareOptions.sourceMaps?: boolean`
+  - `ErrorPareOptions.contextLines?: number`
+  - `CompressionResult.sourceMappedFrames?: number`
+  - `CompressedError.originalLocation?: string`
+  - `CompressedError.context?: CodeContext`
+  - `StackFrame.originalFile/Line/Column?: number`
+
+- **New Modules**:
+  - `src/core/source-maps/source-map-resolver.ts` (430 lines)
+  - `src/core/context/context-reader.ts` (refactored)
+
+- **Test Coverage**:
+  - 37 test cases (100% pass)
+  - Source map restoration tests
+  - Context reader security tests
+
+### Changed
+- **Security Fix**: Path validation now uses `path.relative()` instead of `startsWith()` to prevent sibling path bypass
+- **Context Binding**: Fixed merge index mismatch using `mergeKey->frame` map
+- **CLI Output**: Enhanced with syntax-highlighted code snippets
+
+### Technical
+- New module: `src/core/source-maps/source-map-resolver.ts`
+- New module: `src/core/context/context-reader.ts`
+- Refactored: `src/core/compressor.ts` (context binding logic)
+- Refactored: `src/cli/commands/run.ts` (JSON output)
+- Tests: 37 passed (4 test files)
+
+### Verification
+- `npm test`: 37/37 tests passed ✅
+- `npm run build`: DTS build success (46s) ✅
+- `git commit`: e0628a6 ✅
+
+---
+
 ## [2.0.6] - 2026-03-04
 
 ### Changed

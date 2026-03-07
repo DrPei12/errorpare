@@ -11,6 +11,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0+-blue.svg)](https://typescriptlang.org)
 [![npm](https://img.shields.io/npm/v/errorpare.svg)](https://www.npmjs.com/package/errorpare)
 [![npm downloads](https://img.shields.io/npm/dw/errorpare)](https://www.npmjs.com/package/errorpare)
+[![GitHub Release](https://img.shields.io/github/v/release/DrPei12/errorpare)](https://github.com/DrPei12/errorpare/releases)
 
 </div>
 
@@ -91,6 +92,28 @@ echo "TypeError: x is undefined" | errorpare compress -
 [1x] TypeError: Cannot read properties of undefined
   Location: src/services/user.ts:42:11
   Generated: dist/assets/index.js:1:28492
+```
+
+### 代码上下文附加
+
+自动附加报错位置的代码上下文（前后 5 行），帮助 AI 更快定位问题。
+
+```bash
+[1x] TypeError: Cannot read property 'id' of undefined
+  Location: src/controllers/UserController.ts:22:15
+  
+  Code Context:
+    src/controllers/UserController.ts:22
+    ```
+      17 |   async getUser(req: Request, res: Response) {
+      18 |     const { userId } = req.params;
+      19 |     
+      20 |     // Fetch user from database
+      21 |     const user = await this.userService.findById(userId);
+    > 22 |     return res.json({ id: user.id, name: user.name });
+      23 |   }
+      24 | }
+    ```
 ```
 
 ### 变量遮蔽
