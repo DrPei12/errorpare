@@ -1,0 +1,35 @@
+name: Feature request
+description: Propose a new capability or workflow improvement
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for sharing an idea.
+        Please describe the problem first, then the change you want to see.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem statement
+      description: What workflow or pain point should ErrorPare improve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior, CLI option, JSON field, or integration you want.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional. Tell us what you tried or what workarounds exist today.
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Examples, screenshots, logs, or API payloads.

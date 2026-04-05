@@ -38,12 +38,26 @@ export function maskVariables(line: string): { masked: string; variables: Variab
   });
   
   // Mask generic strings/quoted values (like "value A", "value B")
-  masked = masked.replace(/"([^"]+)"/g, (match, p1) => {
-    // Skip if it looks like a file path or known pattern
-    if (p1.includes('/') || p1.includes('\\') || p1.includes('.py') || p1.includes('.js')) {
+  masked = masked.replace(/(["'])([^"']+)\1/g, (match, _quote, value, offset, source) => {
+    const prefix = source.slice(Math.max(0, offset - 32), offset);
+
+    // Preserve command names in well-known diagnostics like `Missing script: "build"`
+    if (/missing script:\s*$/i.test(prefix)) {
       return match;
     }
-    variables.push({ name: 'string', value: p1, type: 'identifier' });
+
+    // Keep short identifier-like values because they are often the useful part
+    // of diagnostics such as `Cannot read property 'id' of undefined`.
+    if (/^[A-Za-z_][\w.-]{0,63}$/.test(value)) {
+      return match;
+    }
+
+    // Skip if it looks like a file path or known pattern
+    if (value.includes('/') || value.includes('\\') || value.includes('.py') || value.includes('.js')) {
+      return match;
+    }
+
+    variables.push({ name: 'string', value, type: 'identifier' });
     return '<STRING>';
   });
   

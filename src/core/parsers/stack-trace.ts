@@ -192,12 +192,15 @@ function parseJavaScriptTrace(content: string): ParsedStackTrace {
   let message = '';
   const frames: StackFrame[] = [];
   
-  // Extract error type and message from first line
+  // Allow structured log lines before the actual JS error line.
   const firstLine = lines[0].trim();
-  const errorMatch = firstLine.match(/^(TypeError|ReferenceError|SyntaxError|Error|RangeError):\s*(.*)/);
-  if (errorMatch) {
-    type = errorMatch[1];
-    message = errorMatch[2];
+  for (const line of lines) {
+    const errorMatch = line.trim().match(/^([A-Za-z][\w]*(?:Error|Exception)|Error):\s*(.*)/);
+    if (errorMatch) {
+      type = errorMatch[1];
+      message = errorMatch[2];
+      break;
+    }
   }
   
   // Parse frames
@@ -215,7 +218,7 @@ function parseJavaScriptTrace(content: string): ParsedStackTrace {
   }
   
   if (frames.length === 0) {
-    return { type, message: firstLine, frames: [], raw: content };
+    return { type, message: message || firstLine, frames: [], raw: content };
   }
   
   return { type, message, frames, raw: content };
@@ -258,7 +261,7 @@ function parseJavaTrace(content: string): ParsedStackTrace {
  */
 function parseGoTrace(content: string): ParsedStackTrace {
   const lines = content.split('\n');
-  let type = 'panic';
+  const type = 'panic';
   let message = '';
   const frames: StackFrame[] = [];
   
@@ -290,7 +293,7 @@ function parseGoTrace(content: string): ParsedStackTrace {
  */
 function parseRustTrace(content: string): ParsedStackTrace {
   const lines = content.split('\n');
-  let type = 'panic';
+  const type = 'panic';
   let message = '';
   const frames: StackFrame[] = [];
   
@@ -354,7 +357,7 @@ function isThirdParty(path: string): boolean {
  */
 export function stackTraceToCompressed(
   parsed: ParsedStackTrace,
-  language: ProgrammingLanguage
+  _language: ProgrammingLanguage
 ): string {
   const parts: string[] = [];
   

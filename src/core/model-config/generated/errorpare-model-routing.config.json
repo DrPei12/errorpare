@@ -1,0 +1,263 @@
+{
+  "version": 1,
+  "strategy": "openclaw-inspired",
+  "generatedAt": "2026-03-31T01:21:22.534Z",
+  "updatedAt": "2026-03-31T01:21:22.534Z",
+  "notes": [
+    "Generated for ErrorPare from Model-catlog-builder normalized catalog.",
+    "Provider IDs are adapted to ErrorPare naming so the existing CLI can keep simple config values.",
+    "Primary/fallback refs are curated for ErrorPare analyze mode, not for broad multi-agent routing."
+  ],
+  "picker": {
+    "defaultGroup": "recommended",
+    "hidePreviewByDefault": true,
+    "hideDeprecatedByDefault": true,
+    "allowAdvancedModelRefs": true
+  },
+  "agents": {
+    "defaults": {
+      "models": [
+        "openai/gpt-5.4-pro",
+        "openai/gpt-5-mini",
+        "openai/gpt-5.4-mini",
+        "openai/text-embedding-3-large",
+        "openai/gpt-5.4-nano",
+        "anthropic/claude-opus-4-6",
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-opus-4-5",
+        "openrouter/openai/gpt-5.4-mini",
+        "openrouter/openai/gpt-5.4-pro",
+        "openrouter/openai/gpt-5.4",
+        "openrouter/openai/gpt-5.3-codex",
+        "openrouter/openai/gpt-5.4-nano",
+        "gemini/gemma-3n-e2b-it",
+        "gemini/gemini-flash-latest",
+        "gemini/gemini-2.5-pro",
+        "gemini/gemini-flash-lite-latest",
+        "gemini/gemini-embedding-001",
+        "bailian/qwen3.5-plus",
+        "bailian/qvq-max",
+        "bailian/qwen3.5-397b-a17b",
+        "moonshot/kimi-k2.5",
+        "moonshot/kimi-k2",
+        "moonshot/moonshot-v1-32k",
+        "deepseek/deepseek-chat",
+        "deepseek/deepseek-reasoner",
+        "deepseek/deepseek-coder"
+      ],
+      "model": {
+        "primary": "bailian/qwen3.5-plus",
+        "fallbacks": [
+          "openai/gpt-5-mini",
+          "anthropic/claude-sonnet-4-6",
+          "deepseek/deepseek-chat"
+        ]
+      }
+    }
+  },
+  "auth": {
+    "profiles": {
+      "openai": [
+        {
+          "id": "openai:default",
+          "label": "Default OpenAI credential",
+          "type": "api_key",
+          "providerId": "openai"
+        }
+      ],
+      "anthropic": [
+        {
+          "id": "anthropic:default",
+          "label": "Default Anthropic (Claude) credential",
+          "type": "api_key",
+          "providerId": "anthropic"
+        }
+      ],
+      "openrouter": [
+        {
+          "id": "openrouter:default",
+          "label": "Default OpenRouter credential",
+          "type": "api_key",
+          "providerId": "openrouter"
+        }
+      ],
+      "gemini": [
+        {
+          "id": "gemini:default",
+          "label": "Default Google Gemini credential",
+          "type": "api_key",
+          "providerId": "gemini"
+        }
+      ],
+      "bailian": [
+        {
+          "id": "bailian:default",
+          "label": "Default 阿里云百炼 (Qwen) credential",
+          "type": "api_key",
+          "providerId": "bailian"
+        }
+      ],
+      "moonshot": [
+        {
+          "id": "moonshot:default",
+          "label": "Default Moonshot (Kimi) credential",
+          "type": "api_key",
+          "providerId": "moonshot"
+        }
+      ],
+      "deepseek": [
+        {
+          "id": "deepseek:default",
+          "label": "Default DeepSeek credential",
+          "type": "api_key",
+          "providerId": "deepseek"
+        }
+      ]
+    },
+    "order": {
+      "openai": [
+        "openai:default"
+      ],
+      "anthropic": [
+        "anthropic:default"
+      ],
+      "openrouter": [
+        "openrouter:default"
+      ],
+      "gemini": [
+        "gemini:default"
+      ],
+      "bailian": [
+        "bailian:default"
+      ],
+      "moonshot": [
+        "moonshot:default"
+      ],
+      "deepseek": [
+        "deepseek:default"
+      ]
+    }
+  },
+  "providers": {
+    "openai": {
+      "displayName": "OpenAI",
+      "selectionMode": "allowlist",
+      "pickerGroup": "recommended",
+      "allowlist": [
+        "openai/gpt-5.4-pro",
+        "openai/gpt-5-mini",
+        "openai/gpt-5.4-mini",
+        "openai/text-embedding-3-large",
+        "openai/gpt-5.4-nano"
+      ],
+      "defaultPrimary": "openai/gpt-5.4-pro",
+      "defaultFallbacks": [
+        "openai/gpt-5-mini",
+        "openai/gpt-5.4-mini"
+      ],
+      "notes": "Edit this allowlist to control what shows up in the picker for this provider."
+    },
+    "anthropic": {
+      "displayName": "Anthropic (Claude)",
+      "selectionMode": "allowlist",
+      "pickerGroup": "recommended",
+      "allowlist": [
+        "anthropic/claude-opus-4-6",
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-haiku-4-5-20251001",
+        "anthropic/claude-opus-4-5"
+      ],
+      "defaultPrimary": "anthropic/claude-opus-4-6",
+      "defaultFallbacks": [
+        "anthropic/claude-sonnet-4-6",
+        "anthropic/claude-haiku-4-5-20251001"
+      ],
+      "notes": "Edit this allowlist to control what shows up in the picker for this provider."
+    },
+    "openrouter": {
+      "displayName": "OpenRouter",
+      "selectionMode": "allowlist",
+      "pickerGroup": "recommended",
+      "allowlist": [
+        "openrouter/openai/gpt-5.4-mini",
+        "openrouter/openai/gpt-5.4-pro",
+        "openrouter/openai/gpt-5.4",
+        "openrouter/openai/gpt-5.3-codex",
+        "openrouter/openai/gpt-5.4-nano"
+      ],
+      "defaultPrimary": "openrouter/openai/gpt-5.4-mini",
+      "defaultFallbacks": [
+        "openrouter/openai/gpt-5.4-pro",
+        "openrouter/openai/gpt-5.4"
+      ],
+      "notes": "Edit this allowlist to control what shows up in the picker for this provider."
+    },
+    "gemini": {
+      "displayName": "Google Gemini",
+      "selectionMode": "allowlist",
+      "pickerGroup": "recommended",
+      "allowlist": [
+        "gemini/gemma-3n-e2b-it",
+        "gemini/gemini-flash-latest",
+        "gemini/gemini-2.5-pro",
+        "gemini/gemini-flash-lite-latest",
+        "gemini/gemini-embedding-001"
+      ],
+      "defaultPrimary": "gemini/gemma-3n-e2b-it",
+      "defaultFallbacks": [
+        "gemini/gemini-flash-latest",
+        "gemini/gemini-2.5-pro"
+      ],
+      "notes": "Edit this allowlist to control what shows up in the picker for this provider."
+    },
+    "bailian": {
+      "displayName": "阿里云百炼 (Qwen)",
+      "selectionMode": "allowlist",
+      "pickerGroup": "recommended",
+      "allowlist": [
+        "bailian/qwen3.5-plus",
+        "bailian/qvq-max",
+        "bailian/qwen3.5-397b-a17b"
+      ],
+      "defaultPrimary": "bailian/qwen3.5-plus",
+      "defaultFallbacks": [
+        "bailian/qvq-max",
+        "bailian/qwen3.5-397b-a17b"
+      ],
+      "notes": "Edit this allowlist to control what shows up in the picker for this provider."
+    },
+    "moonshot": {
+      "displayName": "Moonshot (Kimi)",
+      "selectionMode": "allowlist",
+      "pickerGroup": "recommended",
+      "allowlist": [
+        "moonshot/kimi-k2.5",
+        "moonshot/kimi-k2",
+        "moonshot/moonshot-v1-32k"
+      ],
+      "defaultPrimary": "moonshot/kimi-k2.5",
+      "defaultFallbacks": [
+        "moonshot/kimi-k2",
+        "moonshot/moonshot-v1-32k"
+      ],
+      "notes": "Edit this allowlist to control what shows up in the picker for this provider."
+    },
+    "deepseek": {
+      "displayName": "DeepSeek",
+      "selectionMode": "allowlist",
+      "pickerGroup": "recommended",
+      "allowlist": [
+        "deepseek/deepseek-chat",
+        "deepseek/deepseek-reasoner",
+        "deepseek/deepseek-coder"
+      ],
+      "defaultPrimary": "deepseek/deepseek-chat",
+      "defaultFallbacks": [
+        "deepseek/deepseek-reasoner",
+        "deepseek/deepseek-coder"
+      ],
+      "notes": "Edit this allowlist to control what shows up in the picker for this provider."
+    }
+  }
+}

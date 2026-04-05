@@ -1,124 +1,107 @@
 # Contributing to ErrorPare
 
-感谢您对 ErrorPare 项目的兴趣！我们欢迎各种形式的贡献，包括但不限于：
+Thanks for your interest in improving ErrorPare.
 
-- 🐛 报告Bug
-- 💡 提出新功能建议
-- 📝 改进文档
-- 🔧 提交代码修复
-- 🌐 翻译项目
-- 💰 赞助项目
+We welcome:
 
-## 📋 贡献指南
+- bug reports
+- feature proposals
+- documentation improvements
+- tests
+- code fixes and refactors
 
-### 开始之前
+## Before you start
 
-1. Fork 本仓库
-2. Clone 您的 fork：
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/errorpare.git
-   cd errorpare
-   ```
-3. 安装依赖：
-   ```bash
-   npm install
-   ```
-4. 创建特性分支：
-   ```bash
-   git checkout -b feature/amazing-feature
-   ```
+1. Search existing issues and pull requests to avoid duplicate work.
+2. Open an issue first for larger changes so we can align on scope.
+3. Keep changes focused. Small, reviewable pull requests are much easier to merge.
 
-### 开发流程
+## Local setup
 
-1. 编写代码并确保通过测试
-2. 运行测试套件：
-   ```bash
-   npm test
-   ```
-3. 运行代码检查：
-   ```bash
-   npm run lint
-   ```
-4. 提交您的更改：
-   ```bash
-   git commit -m 'Add some amazing feature'
-   ```
-5. Push 到 GitHub：
-   ```bash
-   git push origin feature/amazing-feature
-   ```
-6. 打开 Pull Request
+```bash
+git clone https://github.com/DrPei12/errorpare.git
+cd errorpare
+npm install
+```
 
-### 代码规范
+## Useful commands
 
-- 使用 TypeScript
-- 遵循 ESLint 规则
-- 编写单元测试（覆盖率 >80%）
-- 更新文档
+Type-check and run tests:
 
-### Pull Request 指南
+```bash
+npm run check
+```
 
-1. PR 标题清晰描述改动
-2. 描述改动的动机和内容
-3. 链接相关的 Issue
-4. 确保所有 CI 检查通过
+Build the project:
 
-## 🐛 报告Bug
+```bash
+npm run build
+```
 
-请使用 [GitHub Issues](https://github.com/errorpare/errorpare/issues) 报告Bug，包括：
+Run the CLI locally:
 
-- Bug 的清晰描述
-- 重现步骤
-- 期望行为
-- 实际行为
-- 环境信息（Node.js版本、操作系统等）
-- 截图或日志（如果适用）
+```bash
+node dist/cli/index.cjs --help
+```
 
-## 💡 提出新功能
+## Development guidelines
 
-在提出新功能之前，请：
+- Use TypeScript for new source files.
+- Keep changes compatible with Node.js 18+.
+- Add or update tests when behavior changes.
+- Prefer machine-readable stability over cosmetic output changes in JSON mode.
+- Keep documentation in sync with user-facing CLI behavior.
 
-1. 搜索现有 Issue，避免重复
-2. 清晰描述功能需求
-3. 说明使用场景
-4. 如果可能，提供伪代码或示例
+## Pull request checklist
 
-## 📝 文档贡献
+Before opening a pull request, please make sure:
 
-文档改进同样重要！请：
+- the change is scoped and explained clearly
+- tests were added or updated when needed
+- `npm run check` passes locally
+- `npm run build` passes locally
+- relevant docs were updated
 
-1. 确保文档清晰准确
-2. 添加示例代码
-3. 检查语法和拼写
-4. 更新相关文档链接
+## Release process
 
-## 🌍 翻译
+ErrorPare uses two lightweight release layers:
 
-帮助我们将 ErrorPare 翻译成您的语言！
+- `CHANGELOG.md` is the source of truth for the tagged release body
+- GitHub Release Drafter keeps a rolling draft of upcoming changes between tags
 
-1. 复制 `README.md` 为 `README_XX.md`（XX是语言代码）
-2. 翻译内容
-3. 在 README.md 中添加语言链接
+When preparing a release:
 
-## 💰 赞助
+1. Update `package.json`, `src/utils/constants.ts`, and any other version metadata together.
+2. Add a `## [x.y.z] - YYYY-MM-DD` entry to `CHANGELOG.md`.
+3. Run `npm run release:check`.
+4. Tag the release as `vX.Y.Z`.
 
-如果您想财务支持项目：
+The release workflow will validate metadata, build the package, extract the matching changelog entry, create the GitHub Release, and publish to npm when `NPM_TOKEN` is available.
 
-- [GitHub Sponsors](https://github.com/sponsors/errorpare)
-- [Patreon](https://patreon.com/errorpare)
+## Good first contributions
 
-## 📜 行为准则
+If you are looking for a smaller entry point, start with [GOOD_FIRST_ISSUES.md](GOOD_FIRST_ISSUES.md).
 
-请阅读并遵守我们的 [Code of Conduct](CODE_OF_CONDUCT.md)。
+## Reporting bugs
 
-## 感谢 🙏
+Please include:
 
-感谢所有贡献者！
+- what you were trying to do
+- the command you ran
+- expected behavior
+- actual behavior
+- Node.js version
+- operating system
+- a minimal stderr sample, if possible
 
-<a href="https://github.com/errorpare/errorpare/graphs/contributors">
-  <img src="https://contributors-img.web.app/image?repo=errorpare/errorpare" />
-</a>
+Use the bug report template when opening a GitHub issue.
 
----
+## Security
 
-**感谢您的贡献！** 🎉
+Do not open public issues for security vulnerabilities.
+
+Please follow the instructions in [SECURITY.md](SECURITY.md).
+
+## Community
+
+By participating in this project, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).

@@ -1,7 +1,5 @@
 // ErrorPare - Rule Engine (Phase 2)
 
-import chalk from 'chalk';
-
 export interface ErrorRule {
   id: string;
   name: string;
@@ -449,6 +447,17 @@ export class RuleEngine {
         category: 'shell',
         description: 'Command not in PATH',
         suggestion: 'Install the command or add to PATH',
+      },
+      {
+        id: 'gen-006',
+        name: 'npm missing script',
+        language: 'general',
+        pattern: /npm (?:ERR! |error )?Missing script:\s*['"]?([^'"\r\n]+)['"]?/i,
+        severity: 'error',
+        category: 'command',
+        description: 'The requested npm script is not defined in package.json',
+        suggestion: 'Run `npm run` to inspect available scripts, or add the missing script to package.json',
+        examples: ['Missing script: "build"'],
       },
     );
   }

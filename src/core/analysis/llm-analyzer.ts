@@ -1,7 +1,7 @@
 // ErrorPare - LLM Analysis Module
 
 import type { CompressionResult, LLMAnalysis } from '../../types/index.js';
-import { getProvider, getAllModels, findModel, listModels, type LLMProvider, type LLMModel } from './providers.js';
+import { getProvider, findModel, getRecommendedModel, type LLMProvider, type LLMModel } from './providers.js';
 
 export interface LLMConfig {
   provider: string;
@@ -10,8 +10,7 @@ export interface LLMConfig {
   baseURL?: string;
 }
 
-const DEFAULT_PROVIDER = 'groq';
-const DEFAULT_MODEL = 'llama-3.1-70b-versatile';
+const DEFAULT_MODEL = 'deepseek-chat';
 
 /**
  * LLM Analyzer for error root cause analysis
@@ -82,7 +81,7 @@ Response format (JSON):
     const { default: fetch } = await import('node-fetch');
     
     const baseURL = this.config.baseURL || this.providerInfo?.baseUrl || '';
-    const model = this.config.model || DEFAULT_MODEL;
+    const model = this.config.model || getRecommendedModel(this.config.provider)?.id || DEFAULT_MODEL;
     
     if (!baseURL) {
       throw new Error(`Unknown provider: ${this.config.provider}`);
@@ -170,11 +169,12 @@ export function createLLMAnalyzer(
   model?: string
 ): LLMAnalyzer {
   const providerInfo = getProvider(provider);
+  const defaultModel = getRecommendedModel(provider)?.id || DEFAULT_MODEL;
   
   const config: LLMConfig = {
     provider: provider.toLowerCase(),
     apiKey,
-    model: model || DEFAULT_MODEL,
+    model: model || defaultModel,
     baseURL: providerInfo?.baseUrl,
   };
   

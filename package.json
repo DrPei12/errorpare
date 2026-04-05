@@ -1,54 +1,98 @@
 {
   "name": "errorpare",
   "version": "2.1.0",
-  "description": "AI报错压缩工具 - 让Claude/Gemini更高效",
+  "description": "CLI and MCP server for compressing noisy error output into model-friendly debugging payloads.",
   "type": "module",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.cts",
+      "default": "./dist/index.cjs"
+    },
+    "./package.json": "./package.json"
+  },
   "bin": {
-    "errorpare": "dist/cli/index.js",
-    "errorpare-mcp": "dist/bin/mcp.js"
+    "errorpare": "./dist/cli/index.cjs",
+    "errorpare-mcp": "./dist/bin/mcp.cjs"
   },
   "files": [
     "dist",
+    "docs",
     "skill",
-    "docs"
+    "LICENSE",
+    "README.md",
+    "README_EN.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "CONTRIBUTING.md",
+    "CODE_OF_CONDUCT.md",
+    "SECURITY.md",
+    "ROADMAP.md",
+    "GOOD_FIRST_ISSUES.md"
   ],
   "scripts": {
-    "build": "tsup src --dts",
-    "dev": "tsup src --watch",
+    "build": "tsup --config tsup.config.ts",
+    "dev": "tsup --watch --config tsup.config.ts",
+    "models:refresh": "node scripts/refresh-model-config.mjs",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "release:check": "node scripts/check-release-meta.mjs",
+    "release:notes": "node scripts/extract-changelog-entry.mjs",
+    "check": "npm run release:check && npm run typecheck && npm run lint && npm test",
     "lint": "eslint src --ext .ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "postinstall": "node scripts/postinstall.js"
+    "prepack": "npm run build"
   },
   "keywords": [
-    "error",
-    "compression",
-    "deduplication",
+    "cli",
+    "error-parsing",
+    "error-compression",
+    "stack-trace",
+    "source-maps",
     "llm",
-    "mcp",
-    "token-optimization",
     "ai",
+    "mcp",
     "claude",
-    "cursor"
+    "debugging"
   ],
   "author": "ErrorPare Team",
   "license": "MIT",
+  "homepage": "https://github.com/DrPei12/errorpare#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DrPei12/errorpare.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DrPei12/errorpare/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "overrides": {
+    "flatted": "^3.4.1",
+    "minimatch": "^3.1.4"
+  },
   "devDependencies": {
     "@types/cross-spawn": "^6.0.6",
     "@types/node": "^20.10.0",
-    "@typescript-eslint/eslint-plugin": "^6.15.0",
-    "@typescript-eslint/parser": "^6.15.0",
-    "eslint": "^8.55.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.1",
+    "@typescript-eslint/parser": "^8.57.1",
+    "eslint": "^8.57.1",
     "prettier": "^3.1.0",
     "tsup": "^8.0.0",
     "typescript": "^5.3.0",
-    "vitest": "^1.0.0"
+    "vitest": "^3.2.4"
   },
   "dependencies": {
     "chalk": "^4.1.2",
     "commander": "^11.1.0",
     "cross-spawn": "^7.0.6",
+    "model-catlog-builder": "file:../Model-catlog-builder",
     "node-fetch": "^3.3.2",
     "node-pty": "^1.0.0",
     "strip-ansi": "^6.0.1",

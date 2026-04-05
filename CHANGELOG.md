@@ -12,7 +12,7 @@
   - VLQ encoding/decoding for source map parsing
   - Inline data URL source map support
   - External `.map` file auto-discovery
-  - Multi-chain restoration (ts→js→min.js)
+  - Multi-chain restoration (`ts -> js -> min.js`)
   - LRU caching for performance
   - `--source-maps` flag (enabled by default)
 
@@ -46,9 +46,9 @@
 - Tests: 37 passed (4 test files)
 
 ### Verification
-- `npm test`: 37/37 tests passed ✅
-- `npm run build`: DTS build success (46s) ✅
-- `git commit`: e0628a6 ✅
+- `npm test`: 37/37 tests passed
+- `npm run build`: DTS build success (46s)
+- `git commit`: e0628a6
 
 ---
 
@@ -121,4 +121,4 @@
 - Error deduplication with variable masking (IP, UUID, HEX)
 - Multi-language support: TypeScript, Python, Go, Java, Rust
 - MCP server integration
-- OpenClaw Skill 封装
+- OpenClaw skill integration

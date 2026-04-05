@@ -21,6 +21,9 @@ const DEFAULT_CONFIG: Drain3Config = {
   extraDelimiters: [],
 };
 
+const ANSI_ESCAPE = String.fromCharCode(27);
+const ANSI_COLOR_PATTERN = new RegExp(`${ANSI_ESCAPE}\\[[0-9;]*m`, 'g');
+
 /**
  * Drain3 Template Miner
  * Extracts log templates from error messages
@@ -85,7 +88,7 @@ export class Drain3Miner {
    */
   private tokenize(message: string): string[] {
     // Remove ANSI codes
-    const cleaned = message.replace(/\x1b\[[0-9;]*m/g, '');
+    const cleaned = message.replace(ANSI_COLOR_PATTERN, '');
     
     // Split by whitespace and common delimiters
     const delimiters = [...this.config.extraDelimiters, ' ', '\t', '\n', '(', ')', '[', ']', '{', '}', ',', ';', ':', '"', "'", '=', '<', '>'];
@@ -176,7 +179,7 @@ export class Drain3Miner {
       return 'number';
     }
     // Path
-    if (/^[\/\\]/.test(value) || value.includes('/') || value.includes('\\')) {
+    if (/^[/\\]/.test(value) || value.includes('/') || value.includes('\\')) {
       return 'path';
     }
     return 'identifier';
@@ -248,7 +251,7 @@ export interface Drain3Cluster {
  */
 export function processWithDrain3(
   lines: string[],
-  language: ProgrammingLanguage
+  _language: ProgrammingLanguage
 ): { errors: CompressedError[]; statistics: any } {
   const miner = new Drain3Miner();
   const errorMap = new Map<string, CompressedError>();

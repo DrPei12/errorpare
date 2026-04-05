@@ -1,0 +1,103 @@
+name: "ErrorPare"
+description: "Run a command through ErrorPare in CI and emit a compact JSON debugging payload."
+branding:
+  icon: "alert-circle"
+  color: "blue"
+
+inputs:
+  command:
+    description: "Shell command to execute through ErrorPare."
+    required: true
+  analyze:
+    description: "Enable LLM analysis. Requires provider-specific credentials and a provider input."
+    required: false
+    default: "false"
+  provider:
+    description: "LLM provider to configure with `errorpare init --analyze --provider ...` when analyze is enabled."
+    required: false
+  context-lines:
+    description: "Number of source context lines to attach around mapped failures."
+    required: false
+    default: "0"
+  working-directory:
+    description: "Working directory where the command should run."
+    required: false
+    default: "."
+  output-file:
+    description: "Path for the generated JSON payload."
+    required: false
+  write-summary:
+    description: "Write a compact ErrorPare summary to the GitHub Actions job summary."
+    required: false
+    default: "true"
+  fail-on-command-error:
+    description: "Fail the action when the wrapped command fails."
+    required: false
+    default: "true"
+  package-version:
+    description: "npm package version to install. Defaults to the action tag without the leading v, or latest."
+    required: false
+
+outputs:
+  json-path:
+    description: "Path to the generated ErrorPare JSON payload."
+    value: ${{ steps.run.outputs.json-path }}
+  success:
+    description: "Whether the wrapped command succeeded."
+    value: ${{ steps.run.outputs.success }}
+  exit-code:
+    description: "Exit code returned by the wrapped command."
+    value: ${{ steps.run.outputs.exit-code }}
+  error-count:
+    description: "Number of merged error entries in the payload."
+    value: ${{ steps.run.outputs.error-count }}
+  analysis-succeeded:
+    description: "Whether optional LLM analysis completed successfully."
+    value: ${{ steps.run.outputs.analysis-succeeded }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve package version
+      id: version
+      shell: bash
+      run: |
+        set -euo pipefail
+        package_version="${{ inputs.package-version }}"
+        if [ -z "$package_version" ]; then
+          ref="${{ github.action_ref }}"
+          if [[ "$ref" == v* ]]; then
+            package_version="${ref#v}"
+          else
+            package_version="latest"
+          fi
+        fi
+        echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 20
+        registry-url: https://registry.npmjs.org
+
+    - name: Install ErrorPare
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm install --global "errorpare@${{ steps.version.outputs.package_version }}"
+
+    - name: Run ErrorPare
+      id: run
+      shell: bash
+      env:
+        INPUT_COMMAND: ${{ inputs.command }}
+        INPUT_ANALYZE: ${{ inputs.analyze }}
+        INPUT_PROVIDER: ${{ inputs.provider }}
+        INPUT_CONTEXT_LINES: ${{ inputs.context-lines }}
+        INPUT_WORKING_DIRECTORY: ${{ inputs.working-directory }}
+        INPUT_OUTPUT_FILE: ${{ inputs.output-file }}
+        INPUT_WRITE_SUMMARY: ${{ inputs.write-summary }}
+        INPUT_FAIL_ON_COMMAND_ERROR: ${{ inputs.fail-on-command-error }}
+      run: |
+        set -euo pipefail
+        node "${{ github.action_path }}/scripts/run-github-action.mjs"

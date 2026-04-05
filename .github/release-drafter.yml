@@ -1,0 +1,74 @@
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+change-template: "- $TITLE (#$NUMBER) @$AUTHOR"
+no-changes-template: "- No user-facing changes recorded."
+template: |
+  ## Highlights
+
+  $CHANGES
+
+  ## Release checklist
+
+  - [ ] Update `CHANGELOG.md`
+  - [ ] Confirm version metadata
+  - [ ] Tag `v$RESOLVED_VERSION`
+
+categories:
+  - title: Features
+    labels:
+      - feat
+      - feature
+  - title: Fixes
+    labels:
+      - fix
+      - bug
+  - title: Documentation
+    labels:
+      - docs
+  - title: Maintenance
+    labels:
+      - chore
+      - refactor
+      - test
+      - ci
+      - dependencies
+
+exclude-labels:
+  - skip-changelog
+
+version-resolver:
+  major:
+    labels:
+      - major
+  minor:
+    labels:
+      - feat
+      - feature
+  patch:
+    labels:
+      - fix
+      - bug
+      - docs
+      - chore
+      - refactor
+      - test
+      - ci
+      - dependencies
+  default: patch
+
+autolabeler:
+  - label: docs
+    files:
+      - "*.md"
+      - "docs/**/*"
+      - ".github/**/*"
+  - label: test
+    files:
+      - "src/tests/**/*"
+  - label: ci
+    files:
+      - ".github/workflows/**/*"
+  - label: dependencies
+    files:
+      - "package.json"
+      - "package-lock.json"

@@ -1,0 +1,63 @@
+name: Bug report
+description: Report a reproducible problem in ErrorPare
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report.
+        Please include enough detail for us to reproduce the issue.
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the bug and the impact.
+      placeholder: A clear and concise description of the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: List the exact steps to reproduce the issue.
+      placeholder: |
+        1. Run `errorpare ...`
+        2. Observe output
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant stderr or JSON sample
+      description: Paste a minimal sample if possible. Redact secrets.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: ErrorPare version
+      placeholder: 2.1.0
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version
+      placeholder: 20.19.0
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Ubuntu 24.04 / macOS 15 / Windows 11
+    validations:
+      required: true

@@ -1,12 +1,22 @@
 // ErrorPare - Main Compressor
 
 import chalk from 'chalk';
+import { readContexts } from './context/context-reader.js';
 import { applyGitAwareFilter } from './filters/git-aware.js';
 import { deduplicateErrors, limitLines } from './filters/deduplicator.js';
-import { parseStackTrace, stackTraceToCompressed, splitPythonTracebacks, type ParsedStackTrace, type StackFrame } from './parsers/stack-trace.js';
-import { readContexts } from './context/context-reader.js';
-import { SourceMapResolver, getFrameDisplayLocation, getFrameGeneratedLocation } from './source-maps/source-map-resolver.js';
-import type { CompressionResult, ErrorPareOptions, ProgrammingLanguage, CompressedError } from '../types/index.js';
+import {
+  parseStackTrace,
+  splitPythonTracebacks,
+  stackTraceToCompressed,
+  type ParsedStackTrace,
+  type StackFrame,
+} from './parsers/stack-trace.js';
+import {
+  SourceMapResolver,
+  getFrameDisplayLocation,
+  getFrameGeneratedLocation,
+} from './source-maps/source-map-resolver.js';
+import type { CompressedError, CompressionResult, ErrorPareOptions, ProgrammingLanguage } from '../types/index.js';
 import { DEFAULT_OPTIONS } from '../types/index.js';
 
 export { Drain3Miner } from './filters/drain3.js';
@@ -20,14 +30,24 @@ const JAVASCRIPT_KEYWORDS = new Set([
   'delete', 'do', 'else', 'enum', 'export', 'extends', 'false', 'finally', 'for', 'function', 'if',
   'implements', 'import', 'in', 'instanceof', 'interface', 'let', 'new', 'null', 'private', 'protected',
   'public', 'return', 'static', 'super', 'switch', 'this', 'throw', 'true', 'try', 'type', 'typeof',
-  'undefined', 'var', 'void', 'while', 'yield', 'from', 'as', 'readonly', 'declare', 'module'
+  'undefined', 'var', 'void', 'while', 'yield', 'from', 'as', 'readonly', 'declare', 'module',
 ]);
 
 const PYTHON_KEYWORDS = new Set([
   'and', 'as', 'assert', 'async', 'await', 'break', 'class', 'continue', 'def', 'del', 'elif', 'else',
   'except', 'False', 'finally', 'for', 'from', 'global', 'if', 'import', 'in', 'is', 'lambda', 'None',
-  'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield'
+  'nonlocal', 'not', 'or', 'pass', 'raise', 'return', 'True', 'try', 'while', 'with', 'yield',
 ]);
+
+const ACTIONABLE_ERROR_PATTERN =
+  /(?:^|[\s\]])(?:(?:\w+(?:Error|Exception))|panic|fatal|error|exception|failed|failure|denied|invalid|unable)\b[:\s-]/i;
+const BRACKETED_LOG_PATTERN = /^\[[^\]]+\]\s*/;
+const TIMESTAMPED_LOG_PATTERN = /^(?:\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}|\d{2}:\d{2}:\d{2}(?:[.,]\d+)?)/;
+const LOG_LEVEL_PATTERN = /^(?:trace|debug|info|notice|warn|warning)\b[:\s-]/i;
+const STRUCTURED_FIELD_PATTERN = /\b[a-zA-Z_][\w.-]*=[^\s]+/g;
+const PROGRESS_LOG_PATTERN =
+  /\b(?:attempt|completed|completing|finished|retry|retrying|running|starting|started|stage|step|tenant|worker|job|task)\b/i;
+const TEXT_DIVIDER = '-'.repeat(63);
 
 function getErrorMergeKey(error: Pick<CompressedError, 'template' | 'message'>): string {
   return error.template || error.message.substring(0, 100);
@@ -53,9 +73,37 @@ function highlightCode(code: string, language: ProgrammingLanguage): string {
   });
 }
 
+function isNoiseOnlyBlock(block: string, parsed: ParsedStackTrace): boolean {
+  if (parsed.frames.length > 0 || parsed.type !== 'Error') {
+    return false;
+  }
+
+  const [firstLineRaw = ''] = block.split('\n');
+  const firstLine = firstLineRaw.trim();
+  if (!firstLine) {
+    return true;
+  }
+
+  if (ACTIONABLE_ERROR_PATTERN.test(firstLine)) {
+    return false;
+  }
+
+  const structuredFields = firstLine.match(STRUCTURED_FIELD_PATTERN) ?? [];
+  if (structuredFields.length >= 2) {
+    return true;
+  }
+
+  const hasLogPrefix =
+    BRACKETED_LOG_PATTERN.test(firstLine) ||
+    TIMESTAMPED_LOG_PATTERN.test(firstLine) ||
+    LOG_LEVEL_PATTERN.test(firstLine);
+
+  return hasLogPrefix && (structuredFields.length >= 1 || PROGRESS_LOG_PATTERN.test(firstLine));
+}
+
 export function formatHighlightedSnippet(
   snippet: CodeSnippetLike[],
-  language: ProgrammingLanguage = 'unknown'
+  language: ProgrammingLanguage = 'unknown',
 ): string[] {
   if (snippet.length === 0) {
     return [];
@@ -82,19 +130,18 @@ interface CodeSnippetLike {
 export class Compressor {
   private options: ErrorPareOptions;
   private sourceMapResolver: SourceMapResolver;
-  
+
   constructor(options: ErrorPareOptions = {}) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
     this.sourceMapResolver = new SourceMapResolver({
       projectRoot: this.options.projectRoot || process.cwd(),
     });
   }
-  
+
   detectLanguage(content: string): ProgrammingLanguage {
     const lowerContent = content.toLowerCase();
-    
-    if (/\b(?:at\s+[^\s]+\s*\([^)]*:\d+:\d+\))/i.test(content) ||
-        content.includes('.js:') || content.includes('.ts:')) {
+
+    if (/\b(?:at\s+[^\s]+\s*\([^)]*:\d+:\d+\))/i.test(content) || content.includes('.js:') || content.includes('.ts:')) {
       return content.includes('.ts:') ? 'typescript' : 'javascript';
     }
     if (lowerContent.includes('traceback') || /File\s+"[^"]+",\s+line\s+\d+/.test(content)) {
@@ -114,22 +161,21 @@ export class Compressor {
     }
     return 'unknown';
   }
-  
+
   private compressStackTrace(parsed: ParsedStackTrace, language: ProgrammingLanguage): CompressionResult['errors'][0] {
     const normalized = stackTraceToCompressed(parsed, language);
-    const lines = normalized.split('\n').filter(l => l.trim());
-    
-    // Use deduplicateErrors to get proper masking and variables
+    const lines = normalized.split('\n').filter(line => line.trim());
+
     const { errors } = deduplicateErrors(lines, language);
     const mainError = errors[0] || { message: normalized, template: normalized, variables: [] };
-    
+
     const errorType = parsed.type || 'Error';
-    
-    const firstBusinessFrame = parsed.frames.find((f: any) => !f.isThirdParty);
+
+    const firstBusinessFrame = parsed.frames.find((frame: any) => !frame.isThirdParty);
     const displayFrame = firstBusinessFrame || parsed.frames[0];
     const location = displayFrame ? getFrameDisplayLocation(displayFrame) : undefined;
     const originalLocation = displayFrame ? getFrameGeneratedLocation(displayFrame) : undefined;
-    
+
     return {
       count: 1,
       type: errorType,
@@ -140,40 +186,39 @@ export class Compressor {
       originalLocation,
     };
   }
-  
+
   async compress(input: string, command?: string, exitCode: number = 0): Promise<CompressionResult> {
     const startTime = Date.now();
     const options = this.options;
-    
+
     const limited = options.maxLines ? limitLines(input, options.maxLines) : input;
     const originalLines = limited.split('\n').length;
     const language = options.language || this.detectLanguage(limited);
     const shouldRestoreSourceMaps =
-      options.sourceMaps !== false &&
-      (language === 'javascript' || language === 'typescript' || language === 'unknown');
-    
+      options.sourceMaps !== false && (language === 'javascript' || language === 'typescript' || language === 'unknown');
+
     let filtered = limited;
     let thirdPartyCollapsed = 0;
-    
+
     if (options.gitAware && !shouldRestoreSourceMaps) {
       const projectRoot = options.projectRoot || process.cwd();
       const { filtered: gitFiltered, stats } = applyGitAwareFilter(limited, { projectRoot, language });
       filtered = gitFiltered;
       thirdPartyCollapsed = stats.hiddenFrames;
     }
-    
+
     const dedupStart = Date.now();
-    let parsedStackTraces: ParsedStackTrace[] = [];
+    const parsedStackTraces: ParsedStackTrace[] = [];
     let thirdPartyCount = 0;
     let sourceMappedFrames = 0;
-    
+
     if (language === 'python') {
       const tracebackBlocks = splitPythonTracebacks(filtered);
       for (const block of tracebackBlocks) {
         const parsed = parseStackTrace(block, language);
-        if (parsed.frames.length > 0 || parsed.type !== 'Error' || parsed.message) {
+        if (!isNoiseOnlyBlock(block, parsed) && (parsed.frames.length > 0 || parsed.type !== 'Error' || parsed.message)) {
           parsedStackTraces.push(parsed);
-          thirdPartyCount += parsed.frames.filter(f => f.isThirdParty).length;
+          thirdPartyCount += parsed.frames.filter(frame => frame.isThirdParty).length;
         }
       }
     } else {
@@ -181,13 +226,16 @@ export class Compressor {
       for (const block of blocks) {
         if (!block.trim()) continue;
         const parsed = parseStackTrace(block.trim(), language);
-        if (parsed.frames.length > 0 || parsed.type !== 'Error' || parsed.message) {
+        if (!isNoiseOnlyBlock(block, parsed) && (parsed.frames.length > 0 || parsed.type !== 'Error' || parsed.message)) {
           parsedStackTraces.push(parsed);
-          thirdPartyCount += parsed.frames.filter(f => f.isThirdParty).length;
+          thirdPartyCount += parsed.frames.filter(frame => frame.isThirdParty).length;
         }
       }
       if (parsedStackTraces.length === 0) {
-        parsedStackTraces.push(parseStackTrace(filtered, language));
+        const fallbackParsed = parseStackTrace(filtered, language);
+        if (!isNoiseOnlyBlock(filtered, fallbackParsed)) {
+          parsedStackTraces.push(fallbackParsed);
+        }
       }
     }
 
@@ -197,9 +245,9 @@ export class Compressor {
         sourceMappedFrames += restored.restoredFrames;
       }
     }
-    
+
     if (thirdPartyCount > 0) thirdPartyCollapsed = thirdPartyCount;
-    
+
     const compressedErrors: CompressionResult['errors'] = [];
     const mergeKeyToFrame = new Map<string, StackFrame>();
 
@@ -213,21 +261,21 @@ export class Compressor {
         mergeKeyToFrame.set(mergeKey, relevantFrame);
       }
     }
-    
+
     const mergedErrors = this.mergeErrors(compressedErrors);
-    
-    // Enrich errors with code context if enabled
+
     const contextLines = Math.min(Math.max(0, options.contextLines ?? 5), 20);
     if (contextLines > 0) {
       await this.enrichErrorsWithContext(mergedErrors, mergeKeyToFrame, contextLines);
     }
-    
+
     const compressionTime = Date.now() - dedupStart;
-    const totalOriginal = parsedStackTraces.length || 1;
-    const rate = totalOriginal > 0 ? Math.max(0, (totalOriginal - mergedErrors.length) / totalOriginal) : 0;
+    const compressedLines = mergedErrors.length;
+    const rate =
+      originalLines > 0 ? Math.max(0, (originalLines - compressedLines) / originalLines) : 0;
     const summary = this.buildSummary(mergedErrors, originalLines, thirdPartyCollapsed);
     const totalTime = Date.now() - startTime;
-    
+
     return {
       success: exitCode === 0,
       exitCode,
@@ -235,7 +283,7 @@ export class Compressor {
       timing: { total: totalTime, compression: compressionTime },
       compression: {
         originalLines,
-        compressedLines: mergedErrors.length,
+        compressedLines,
         rate,
         uniqueErrors: mergedErrors.length,
         thirdPartyCollapsed: thirdPartyCollapsed > 0 ? thirdPartyCollapsed : undefined,
@@ -245,11 +293,11 @@ export class Compressor {
       summary,
     };
   }
-  
+
   private async enrichErrorsWithContext(
     errors: CompressedError[],
     mergeKeyToFrame: Map<string, StackFrame>,
-    contextLines: number
+    contextLines: number,
   ): Promise<void> {
     const projectRoot = this.options.projectRoot || process.cwd();
     const pendingFrames = errors
@@ -268,8 +316,8 @@ export class Compressor {
         readContexts([frame], {
           projectRoot,
           contextLines,
-        }).then(results => results[0] ?? null)
-      )
+        }).then(results => results[0] ?? null),
+      ),
     );
 
     pendingFrames.forEach(({ error }, index) => {
@@ -279,28 +327,28 @@ export class Compressor {
       }
     });
   }
-  
+
   private mergeErrors(errors: CompressionResult['errors']): CompressionResult['errors'] {
     const errorMap = new Map<string, CompressionResult['errors'][0]>();
-    
+
     for (const error of errors) {
       const key = getErrorMergeKey(error);
-      
+
       if (errorMap.has(key)) {
         const existing = errorMap.get(key)!;
         existing.count += error.count;
-        
-        for (const v of error.variables) {
-          const existingVar = existing.variables.find(ev => ev.name === v.name);
+
+        for (const variable of error.variables) {
+          const existingVar = existing.variables.find(entry => entry.name === variable.name);
           if (existingVar) {
-            if (!existingVar.value.includes(v.value)) {
-              existingVar.value = `${existingVar.value}, ${v.value}`;
+            if (!existingVar.value.includes(variable.value)) {
+              existingVar.value = `${existingVar.value}, ${variable.value}`;
             }
           } else {
-            existing.variables.push({ ...v });
+            existing.variables.push({ ...variable });
           }
         }
-        
+
         if (error.location && error.location !== existing.location) {
           if (!existing.location?.includes(error.location)) {
             existing.location = `${existing.location}, ${error.location}`;
@@ -318,15 +366,15 @@ export class Compressor {
         errorMap.set(key, { ...error });
       }
     }
-    
+
     return Array.from(errorMap.values());
   }
-  
+
   private buildSummary(errors: CompressionResult['errors'], originalLines: number, thirdPartyCollapsed: number): string {
     const parts: string[] = [];
     if (thirdPartyCollapsed > 0) parts.push(`${thirdPartyCollapsed} third-party frames collapsed`);
     if (errors.length > 0) {
-      const totalCount = errors.reduce((sum, e) => sum + e.count, 0);
+      const totalCount = errors.reduce((sum, error) => sum + error.count, 0);
       const topError = [...errors].sort((a, b) => b.count - a.count)[0];
       parts.push(`${errors.length} unique errors from ${totalCount} occurrences`);
       parts.push(`Most common: ${topError.type} (${topError.count}x)`);
@@ -335,31 +383,37 @@ export class Compressor {
     }
     return parts.join('. ');
   }
-  
+
   formatAsText(result: CompressionResult): string {
     const lines: string[] = [];
     const language = this.options.language || 'unknown';
 
-    lines.push(`[ErrorPare] ${result.command} ${result.exitCode === 0 ? 'succeeded' : 'failed'} (exit code ${result.exitCode})`);
+    if (result.command.trim()) {
+      lines.push(
+        `[ErrorPare] ${result.command} ${result.exitCode === 0 ? 'succeeded' : 'failed'} (exit code ${result.exitCode})`,
+      );
+    }
     if (result.compression.thirdPartyCollapsed) {
       lines.push(`[ErrorPare] Git-aware trimming: ${result.compression.thirdPartyCollapsed} third-party frames collapsed`);
     }
     if (result.compression.sourceMappedFrames) {
       lines.push(`[ErrorPare] Source maps restored: ${result.compression.sourceMappedFrames} frame(s)`);
     }
-    lines.push(`[ErrorPare] Compression: ${Math.round(result.compression.rate * 100)}% (${result.compression.originalLines} → ${result.compression.compressedLines} lines)`);
+    lines.push(
+      `[ErrorPare] Compression: ${Math.round(result.compression.rate * 100)}% (${result.compression.originalLines} -> ${result.compression.compressedLines} lines)`,
+    );
     lines.push('');
-    lines.push('═══════════════════════════════════════════════════════════════');
+    lines.push(TEXT_DIVIDER);
     lines.push('');
     for (const error of result.errors) {
       lines.push(`[${error.count}x] ${error.type}: ${error.message}`);
       if (error.location) lines.push(`  Location: ${error.location}`);
       if (error.originalLocation) lines.push(`  Generated: ${error.originalLocation}`);
       if (error.variables.length > 0) {
-        lines.push(`  Variables: ${error.variables.map(v => `${v.name}=${v.value}`).join(', ')}`);
+        lines.push(`  Variables: ${error.variables.map(variable => `${variable.name}=${variable.value}`).join(', ')}`);
       }
-      if (error.suggestion) lines.push(`  → ${error.suggestion}`);
-      
+      if (error.suggestion) lines.push(`  Suggestion: ${error.suggestion}`);
+
       if (error.context && error.context.snippet.length > 0) {
         lines.push('');
         lines.push('  Code Context:');
@@ -370,10 +424,10 @@ export class Compressor {
         }
         lines.push('  ```');
       }
-      
+
       lines.push('');
     }
-    lines.push('═══════════════════════════════════════════════════════════════');
+    lines.push(TEXT_DIVIDER);
     lines.push('');
     lines.push(`Summary: ${result.summary}`);
     return lines.join('\n');

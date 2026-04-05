@@ -1,6 +1,6 @@
 // ErrorPare - Git-Aware Stack Frame Filter
 
-import { THIRD_PARTY_PATTERNS, STACK_TRACE_PATTERNS } from '../../utils/constants.js';
+import { THIRD_PARTY_PATTERNS } from '../../utils/constants.js';
 import type { StackFrame, ProgrammingLanguage } from '../../types/index.js';
 
 export interface GitAwareOptions {
@@ -57,7 +57,7 @@ export function extractFrameworkName(path: string): string {
   }
   
   // Extract package name from node_modules
-  const nodeModulesMatch = normalizedPath.match(/node_modules\/(@[^\/]+\/[^\/]+|[^\/]+)/);
+  const nodeModulesMatch = normalizedPath.match(/node_modules\/(@[^/]+\/[^/]+|[^/]+)/);
   if (nodeModulesMatch) {
     return nodeModulesMatch[1];
   }

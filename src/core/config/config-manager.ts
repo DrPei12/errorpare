@@ -1,17 +1,32 @@
 // ErrorPare - Configuration Manager (Phase 2)
 
 import * as fs from 'fs';
-import * as path from 'path';
 import * as os from 'os';
+import * as path from 'path';
+
 import chalk from 'chalk';
 
 export interface LLMConfig {
-  provider: 'openai' | 'anthropic' | 'bailian' | 'moonshot' | 'deepseek' | 'custom';
+  provider:
+    | 'openai'
+    | 'anthropic'
+    | 'bailian'
+    | 'moonshot'
+    | 'deepseek'
+    | 'openrouter'
+    | 'groq'
+    | 'gemini'
+    | 'custom';
   model: string;
   apiKey: string;
   baseUrl?: string;
   maxTokens?: number;
   temperature?: number;
+  modelRef?: string;
+  source?: 'manual' | 'model-catalog';
+  sourceProviderId?: string;
+  modelCatalogTenantId?: string;
+  modelCatalogProfilePath?: string;
 }
 
 export interface RuleConfig {
@@ -32,8 +47,9 @@ export interface ErrorPareConfig {
   };
 }
 
-const ERRORPARE_VERSION = '2.0.0';
-const CONFIG_DIR = path.join(os.homedir(), '.errorpare');
+const ERRORPARE_VERSION = '2.1.0';
+export const ERRORPARE_HOME_DIR = path.join(os.homedir(), '.errorpare');
+export const CONFIG_DIR = ERRORPARE_HOME_DIR;
 const CONFIG_FILE = path.join(CONFIG_DIR, 'config.json');
 
 const DEFAULT_CONFIG: ErrorPareConfig = {
@@ -50,6 +66,24 @@ const DEFAULT_CONFIG: ErrorPareConfig = {
   },
 };
 
+function stripUtf8Bom(content: string): string {
+  return content.replace(/^\uFEFF/, '');
+}
+
+function normalizeLoadedConfig(config: ErrorPareConfig): ErrorPareConfig {
+  if (config.llm?.provider === 'deepseek' && config.llm.model === 'deepseek-v3.2') {
+    return {
+      ...config,
+      llm: {
+        ...config.llm,
+        model: 'deepseek-chat',
+      },
+    };
+  }
+
+  return config;
+}
+
 export class ConfigManager {
   private config: ErrorPareConfig;
   private configPath: string;
@@ -62,12 +96,16 @@ export class ConfigManager {
   private loadConfig(): ErrorPareConfig {
     try {
       if (fs.existsSync(this.configPath)) {
-        const content = fs.readFileSync(this.configPath, 'utf-8');
+        const content = stripUtf8Bom(fs.readFileSync(this.configPath, 'utf-8'));
         const loaded = JSON.parse(content);
-        return { ...DEFAULT_CONFIG, ...loaded, settings: { ...DEFAULT_CONFIG.settings, ...loaded.settings } };
+        return normalizeLoadedConfig({
+          ...DEFAULT_CONFIG,
+          ...loaded,
+          settings: { ...DEFAULT_CONFIG.settings, ...loaded.settings },
+        });
       }
     } catch (error) {
-      console.warn(chalk.yellow(`⚠️  Config load error: ${(error as Error).message}. Using defaults.`));
+      console.warn(chalk.yellow(`Warning: config load error: ${(error as Error).message}. Using defaults.`));
     }
     return { ...DEFAULT_CONFIG };
   }
@@ -79,7 +117,7 @@ export class ConfigManager {
       }
       this.config.version = ERRORPARE_VERSION;
       fs.writeFileSync(this.configPath, JSON.stringify(this.config, null, 2));
-      console.log(chalk.green(`✅ Config saved to ${this.configPath}`));
+      console.log(chalk.green(`Config saved to ${this.configPath}`));
     } catch (error) {
       throw new Error(`Failed to save config: ${(error as Error).message}`);
     }
@@ -101,9 +139,7 @@ export class ConfigManager {
   }
 
   isLLMConfigured(): boolean {
-    return this.config.mode === 'analyze' && 
-           this.config.llm !== undefined && 
-           this.config.llm.apiKey !== undefined;
+    return this.config.mode === 'analyze' && this.config.llm !== undefined && this.config.llm.apiKey !== undefined;
   }
 
   getConfigPath(): string {

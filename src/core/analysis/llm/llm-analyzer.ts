@@ -19,6 +19,19 @@ export interface LLMProvider {
   analyze(errorText: string, config: LLMConfig): Promise<AnalysisResult>;
 }
 
+const DEBUGGER_JSON_INSTRUCTIONS = `You are an expert debugger. Analyze the error and provide:
+1. rootCause: Brief explanation of what caused the error
+2. category: One of [null-safety, type-safety, module, syntax, runtime, network, file-io, memory, permissions, command, configuration, other]
+3. suggestion: Concrete fix recommendation
+4. codeFix: Optional code snippet showing the fix
+
+Important categorization rules:
+- Use "command" for missing npm/yarn/pnpm scripts, invalid CLI invocations, or shell command problems.
+- Use "configuration" for misconfigured package.json, config files, or missing setup values.
+- Do not classify missing npm scripts as "module" unless the error is actually about an import/package resolution failure.
+
+Respond in JSON format only.`;
+
 export class LLMAnalyzer {
   private config?: LLMConfig;
 
@@ -41,7 +54,7 @@ export class LLMAnalyzer {
     }
 
     try {
-      console.log(chalk.gray(`📊 Analyzing with ${this.config.provider}/${this.config.model}...`));
+      console.log(chalk.gray(`Analyzing with ${this.config.provider}/${this.config.model}...`));
       const result = await provider.analyze(errorText, this.config);
       return result;
     } catch (error) {
@@ -55,9 +68,15 @@ export class LLMAnalyzer {
         return new OpenAIProvider();
       case 'anthropic':
         return new AnthropicProvider();
+      case 'openrouter':
+      case 'groq':
       case 'bailian':
       case 'moonshot':
       case 'deepseek':
+        return new OpenAICompatibleProvider(providerName);
+      case 'gemini':
+        return new GeminiProvider();
+      case 'custom':
         return new OpenAICompatibleProvider(providerName);
       default:
         return null;
@@ -82,6 +101,15 @@ export class LLMAnalyzer {
           category: 'module',
           suggestion: 'Run npm install <package-name> or check import path',
           confidence: 0.95,
+        },
+      },
+      {
+        pattern: /npm (?:ERR! |error )?Missing script:\s*['"]?([^'"\n]+)['"]?/i,
+        result: {
+          rootCause: 'The requested npm script is not defined in package.json',
+          category: 'command',
+          suggestion: 'Run `npm run` to inspect available scripts, or add the missing script to package.json',
+          confidence: 0.98,
         },
       },
       {
@@ -144,13 +172,7 @@ class OpenAICompatibleProvider implements LLMProvider {
         messages: [
           {
             role: 'system',
-            content: `You are an expert debugger. Analyze the error and provide:
-1. rootCause: Brief explanation of what caused the error
-2. category: One of [null-safety, type-safety, module, syntax, runtime, network, file-io, memory, permissions, other]
-3. suggestion: Concrete fix recommendation
-4. codeFix: Optional code snippet showing the fix
-
-Respond in JSON format only.`,
+            content: DEBUGGER_JSON_INSTRUCTIONS,
           },
           {
             role: 'user',
@@ -191,6 +213,8 @@ Respond in JSON format only.`,
   private getDefaultBaseUrl(provider: string): string {
     const urls: Record<string, string> = {
       openai: 'https://api.openai.com/v1',
+      openrouter: 'https://openrouter.ai/api/v1',
+      groq: 'https://api.groq.com/openai/v1',
       bailian: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
       moonshot: 'https://api.moonshot.cn/v1',
       deepseek: 'https://api.deepseek.com/v1',
@@ -224,7 +248,7 @@ class AnthropicProvider implements LLMProvider {
         messages: [
           {
             role: 'user',
-            content: `You are an expert debugger. Analyze this error and provide JSON response:
+            content: `${DEBUGGER_JSON_INSTRUCTIONS}
 
 {
   "rootCause": "explanation",
@@ -262,6 +286,76 @@ ${errorText}`,
       codeFix: parsed.codeFix,
       model: config.model,
       tokensUsed: data.usage?.total_tokens,
+    };
+  }
+}
+
+class GeminiProvider implements LLMProvider {
+  readonly name = 'gemini';
+
+  async analyze(errorText: string, config: LLMConfig): Promise<AnalysisResult> {
+    const model = config.model || 'gemini-2.5-flash';
+    const baseUrl = config.baseUrl || 'https://generativelanguage.googleapis.com/v1beta';
+    const url = `${baseUrl}/models/${model}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        generationConfig: {
+          temperature: config.temperature || 0.1,
+          maxOutputTokens: Math.min(config.maxTokens || 2000, 4096),
+          responseMimeType: 'application/json',
+        },
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: `${DEBUGGER_JSON_INSTRUCTIONS}
+
+{
+  "rootCause": "explanation",
+  "category": "category",
+  "suggestion": "fix recommendation",
+  "codeFix": "optional code"
+}
+
+Error:
+${errorText}`,
+              },
+            ],
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`API error (${response.status}): ${error}`);
+    }
+
+    const data: any = await response.json();
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
+
+    if (!content) {
+      throw new Error('Empty response from Gemini');
+    }
+
+    const parsed = JSON.parse(content);
+
+    return {
+      rootCause: parsed.rootCause || 'Unknown error',
+      confidence: 0.8,
+      category: parsed.category || 'unknown',
+      suggestion: parsed.suggestion || 'Review the error and fix accordingly',
+      codeFix: parsed.codeFix,
+      model,
+      tokensUsed:
+        data.usageMetadata?.totalTokenCount ||
+        data.usageMetadata?.promptTokenCount + data.usageMetadata?.candidatesTokenCount,
     };
   }
 }

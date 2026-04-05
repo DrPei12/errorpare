@@ -208,7 +208,12 @@ export class ErrorPareMCPServer {
 
         case 'resources/list':
           return this.createResponse(id, {
-            resources: MCP_RESOURCES.map(({ fileName, ...resource }) => resource),
+            resources: MCP_RESOURCES.map(({ uri, name, description, mimeType }) => ({
+              uri,
+              name,
+              description,
+              mimeType,
+            })),
           });
 
         case 'resources/read':
@@ -402,7 +407,7 @@ export function startMCPServer(): void {
           if (response) {
             console.log(JSON.stringify(response));
           }
-        } catch (e) {
+        } catch {
           // Ignore parse errors
         }
       }
@@ -419,7 +424,7 @@ export function startMCPServer(): void {
             console.log(JSON.stringify(response));
           }
         });
-      } catch (e) {
+      } catch {
         // Ignore
       }
     }

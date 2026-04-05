@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import path from 'path';
 import { ErrorPareMCPServer } from '../mcp/server.js';
 
 describe('ErrorPareMCPServer', () => {
@@ -72,7 +73,7 @@ describe('ErrorPareMCPServer', () => {
         arguments: {
           errors: "TypeError: Cannot read property 'id' of undefined",
           includeCompression: true,
-          projectRoot: '/mnt/d/Desktop/ErrorPare',
+          projectRoot: path.resolve(process.cwd()),
         },
       },
     });

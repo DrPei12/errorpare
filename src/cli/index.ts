@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // ErrorPare - CLI Entry Point (Phase 2)
 
 import { Command } from 'commander';
@@ -12,16 +14,14 @@ const program = new Command();
 
 program
   .name('errorpare')
-  .description('AI 报错压缩工具 - 让 Claude/Gemini 更高效')
+  .description('Compress noisy stderr into model-friendly debugging output')
   .version(ERRORPARE_VERSION);
 
-// Add commands
 program.addCommand(createRunCommand());
 program.addCommand(createInitCommand());
 program.addCommand(createCompressCommand());
 program.addCommand(createConfigCommand());
 
-// Handle errors
 process.on('uncaughtException', (error) => {
   console.error(chalk.red('Error:'), error.message);
   process.exit(1);
@@ -32,5 +32,4 @@ process.on('unhandledRejection', (reason) => {
   process.exit(1);
 });
 
-// Parse and execute
 program.parse();

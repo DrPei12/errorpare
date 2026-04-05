@@ -15,10 +15,23 @@ export interface CommandExecutorOptions {
  * Try to load node-pty, fallback to null if not available
  */
 let nodePty: any = null;
-try {
-  nodePty = require('node-pty');
-} catch (e) {
-  // node-pty not available, will use cross-spawn fallback
+let nodePtyLoadAttempted = false;
+
+async function loadNodePty(): Promise<any | null> {
+  if (nodePtyLoadAttempted) {
+    return nodePty;
+  }
+
+  nodePtyLoadAttempted = true;
+
+  try {
+    const mod = await import('node-pty');
+    nodePty = (mod as { default?: unknown }).default ?? mod;
+  } catch {
+    nodePty = null;
+  }
+
+  return nodePty;
 }
 
 /**
@@ -35,14 +48,16 @@ export class CommandExecutor extends EventEmitter {
   
   constructor(private options: CommandExecutorOptions = {}) {
     super();
-    // Check if node-pty is available
-    this.usePty = !!nodePty;
   }
   
   /**
    * Executes a command and returns the result
    */
   async execute(command: string): Promise<ExecutionResult> {
+    if (!nodePtyLoadAttempted) {
+      this.usePty = !!(await loadNodePty());
+    }
+
     if (this.usePty) {
       return this.executeWithPty(command);
     } else {
@@ -54,7 +69,6 @@ export class CommandExecutor extends EventEmitter {
    * Execute with node-pty (best experience)
    */
   private async executeWithPty(command: string): Promise<ExecutionResult> {
-    const { execSync } = await import('child_process');
     const os = await import('os');
     const cwd = this.options.cwd || process.cwd();
     const shell = this.options.shell || (os.platform() === 'win32' ? 'powershell.exe' : 'bash');
@@ -88,7 +102,7 @@ export class CommandExecutor extends EventEmitter {
           });
         });
         
-      } catch (error) {
+      } catch {
         // Fallback to spawn on error
         this.usePty = false;
         this.executeWithSpawn(command).then(resolve).catch(reject);
@@ -143,10 +157,10 @@ export class CommandExecutor extends EventEmitter {
         });
       });
       
-      child.on('error', (err: Error) => {
+      child.on('error', (error: Error) => {
         resolve({
           stdout: '',
-          stderr: err.message,
+          stderr: error.message,
           exitCode: 1,
         });
       });
